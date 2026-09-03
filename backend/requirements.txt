@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# Automated Road Health Assessment & Grievance Tool - backend dependencies
+# Target: Python 3.11+ (Render's version is pinned in render.yaml)
+#
+# IMPORTANT - install order on Linux:
+#   Plain `pip install torch` on Linux pulls ~2.5 GB of NVIDIA CUDA wheels,
+#   which is useless without a GPU and will not fit on a free Render instance.
+#   Install the CPU-only build FIRST, then this file:
+#
+#       pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+#       pip install -r requirements.txt
+#
+#   build.sh does exactly that for Render. On macOS and Windows the normal
+#   wheels are already CPU-only, so `pip install -r requirements.txt` is enough.
+# ---------------------------------------------------------------------------
+
+# --- Web framework ---------------------------------------------------------
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.32.0,<1.0.0
+python-multipart>=0.0.12,<1.0.0        # required for multipart/form-data uploads
+
+# --- Configuration & validation -------------------------------------------
+pydantic>=2.9.0,<3.0.0
+pydantic-settings>=2.5.0,<3.0.0
+
+# --- Imaging & numerics ----------------------------------------------------
+pillow>=10.4.0,<13.0.0
+numpy>=1.26.0,<3.0.0
+opencv-python-headless>=4.10.0,<5.0.0  # headless build: no libGL needed on slim Linux
+
+# --- PDF -------------------------------------------------------------------
+reportlab>=4.2.0,<6.0.0
+
+# --- Machine learning ------------------------------------------------------
+torch>=2.5.0,<3.0.0                    # see the install-order note above
+torchvision>=0.20.0,<1.0.0
+ultralytics>=8.3.0,<9.0.0              # YOLOv8 / YOLO11 inference
