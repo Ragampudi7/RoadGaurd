@@ -1,0 +1,58 @@
+# Render blueprint. Push this repo to GitHub, then in Render choose
+# "New +" -> "Blueprint" and point it at the repository.
+services:
+  - type: web
+    name: road-health-api
+    runtime: python
+    plan: free
+    region: singapore          # closest free region to India; change if needed
+    rootDir: backend           # remove this line if backend/ is the repo root
+    buildCommand: "bash build.sh"
+    # Render injects $PORT - it must never be hardcoded.
+    # One worker only: a free instance has 512 MB RAM and a YOLO process needs
+    # most of it. Extra workers cause out-of-memory restarts, not throughput.
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 65"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MODEL_PATH
+        value: weights/best.pt
+      - key: ALLOW_PRETRAINED_FALLBACK
+        value: "true"          # set to "false" once weights/best.pt is committed
+      - key: FALLBACK_MODEL_NAME
+        value: yolov8n.pt
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.25"
+      - key: IOU_THRESHOLD
+        value: "0.45"
+      - key: INFERENCE_IMAGE_SIZE
+        value: "640"
+      - key: MAX_IMAGE_SIZE_MB
+        value: "10"
+      - key: AREA_METHOD
+        value: sum
+      - key: INCLUDE_DEFECT_CROPS
+        value: "true"
+      - key: MAX_CONCURRENT_INFERENCES
+        value: "1"
+      # Torch spawns one thread per core by default and then fights itself on a
+      # shared-CPU instance. Pinning to a single thread is measurably faster here.
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      # Ultralytics writes a settings file and a fonts cache; point them at a
+      # writable location and keep telemetry off.
+      - key: YOLO_CONFIG_DIR
+        value: /tmp/ultralytics
+      # Set this in the Render dashboard to your deployed frontend URL.
+      - key: FRONTEND_URL
+        sync: false
+      - key: EXTRA_CORS_ORIGINS
+        sync: false

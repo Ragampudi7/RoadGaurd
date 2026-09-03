@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Road Health API - Test Client</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1a1a1a; --muted:#5a5a5a;
+    --line:#dcdfe4; --brand:#123a63; --accent:#1a5fa8;
+    --good:#1b7f3b; --fair:#b8860b; --poor:#c2560f; --danger:#b01b1b;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#14161a; --card:#1c1f25; --ink:#eceef1; --muted:#9aa1ab;
+           --line:#2c313a; --brand:#3d7fc4; --accent:#5b9ee0; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       padding:24px 16px 64px}
+  .wrap{max-width:940px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:20px;margin-bottom:18px}
+  label{display:block;font-weight:600;font-size:13px;margin:0 0 6px}
+  input[type=text],input[type=number],input[type=file]{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg);color:var(--ink);font:inherit;font-size:14px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:190px}
+  button{background:var(--brand);color:#fff;border:0;border-radius:8px;
+         padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;color:var(--accent);
+               border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .mt{margin-top:14px}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .banner{border-radius:8px;padding:11px 14px;font-size:13.5px;margin-bottom:14px}
+  .banner.err{background:#fdecec;color:#8c1414;border:1px solid #f3c4c4}
+  .banner.warn{background:#fff6e0;color:#7a5300;border:1px solid #f0dca8}
+  @media (prefers-color-scheme:dark){
+    .banner.err{background:#3a1d1d;color:#ffb4b4;border-color:#5c2a2a}
+    .banner.warn{background:#3a3018;color:#f5d78a;border-color:#5c4d23}
+  }
+  .score{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch;margin-bottom:16px}
+  .score>div{flex:1;min-width:190px;border-radius:10px;padding:16px;text-align:center}
+  .score .num{background:var(--bg);border:1px solid var(--line)}
+  .score .num b{display:block;font-size:40px;line-height:1.05}
+  .score .cond{color:#fff}
+  .score .cond b{display:block;font-size:26px;line-height:1.5}
+  .score small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  img.preview{width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+  pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;
+      padding:12px;overflow:auto;font-size:12px;max-height:340px}
+  .hidden{display:none}
+  .riskhead{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .riskbig{min-width:150px;border-radius:10px;padding:14px 18px;text-align:center;color:#fff}
+  .riskbig b{display:block;font-size:34px;line-height:1.1}
+  .riskbig small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
+  .riskmeta{flex:1;min-width:220px;font-size:13.5px}
+  .riskmeta .tier{font-weight:700;font-size:15px}
+  .riskmeta .win{color:var(--muted)}
+  .meter{display:flex;gap:3px;margin:10px 0 4px}
+  .meter span{flex:1;height:9px;border-radius:3px;opacity:.35}
+  .meter span.on{opacity:1}
+  .meterlabels{display:flex;gap:3px;font-size:10px;color:var(--muted);
+               text-transform:uppercase;letter-spacing:.05em}
+  .meterlabels span{flex:1;text-align:center}
+  .comp{display:grid;grid-template-columns:96px 1fr 56px;gap:10px;align-items:center;
+        margin-top:8px;font-size:13px}
+  .track{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+  .track i{display:block;height:100%;border-radius:4px}
+  .compnote{grid-column:1 / -1;font-size:11.5px;color:var(--muted);margin-top:-4px}
+  .sev{font-weight:700}
+  .crops{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .crops figure{margin:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+                background:var(--bg)}
+  .crops img{display:block;width:100%}
+  .crops figcaption{padding:6px 8px;font-size:11.5px;color:var(--muted);text-align:center}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff6;
+           border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;
+           vertical-align:-2px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Road Health API - Test Client</h1>
+  <p class="sub">
+    A dependency-free page that does exactly what your real frontend will do:
+    read the browser's GPS, upload a photo, show the findings and download the PDF.
+    Serve it with <code>python -m http.server 3000</code> from this folder so the
+    origin matches <code>FRONTEND_URL</code> and geolocation is allowed.
+  </p>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="api">API base URL</label>
+        <input id="api" type="text" value="http://localhost:8000">
+      </div>
+      <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+        <button class="ghost" id="ping" type="button">Check /health</button>
+      </div>
+    </div>
+    <div id="healthOut" class="hint"></div>
+  </div>
+
+  <form class="card" id="form">
+    <label for="file">Road photograph</label>
+    <input id="file" type="file" accept="image/jpeg,image/png,image/webp,image/bmp" required>
+
+    <div class="row mt">
+      <div>
+        <label for="lat">Latitude</label>
+        <input id="lat" type="number" step="any" placeholder="17.494800" required>
+      </div>
+      <div>
+        <label for="lon">Longitude</label>
+        <input id="lon" type="number" step="any" placeholder="78.399600" required>
+      </div>
+      <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+        <button class="ghost" id="geo" type="button">Use my location</button>
+      </div>
+    </div>
+    <div class="hint" id="geoOut">Geolocation needs HTTPS or localhost. You can also type coordinates by hand.</div>
+
+    <div class="mt">
+      <button id="submit" type="submit">Analyse road</button>
+    </div>
+  </form>
+
+  <div id="error" class="banner err hidden"></div>
+
+  <div id="results" class="hidden">
+    <div id="warnings"></div>
+
+    <div class="card">
+      <div class="score">
+        <div class="num"><b id="scoreVal">-</b><small>Road health score / 100</small></div>
+        <div class="cond" id="condBox"><b id="condVal">-</b><small>Assessed condition</small></div>
+      </div>
+      <table>
+        <tbody>
+          <tr><th>Defect area</th><td id="pct"></td></tr>
+          <tr><th>Total defects</th><td id="count"></td></tr>
+          <tr><th>Breakdown</th><td id="counts"></td></tr>
+          <tr><th>Model</th><td id="modelInfo"></td></tr>
+          <tr><th>Processing time</th><td id="timing"></td></tr>
+          <tr><th>Reference</th><td id="ref"></td></tr>
+        </tbody>
+      </table>
+      <div class="mt">
+        <button id="download" type="button">Download PDF report</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Road risk assessment</label>
+      <div class="riskhead">
+        <div class="riskbig" id="riskBox">
+          <b id="riskVal">-</b><small id="riskLevel">-</small>
+        </div>
+        <div class="riskmeta">
+          <div class="tier" id="riskTier">-</div>
+          <div class="win" id="riskWindow">-</div>
+          <div class="meter" id="riskMeter"></div>
+          <div class="meterlabels">
+            <span>Low</span><span>Moderate</span><span>High</span><span>Critical</span>
+          </div>
+        </div>
+      </div>
+      <div id="riskComponents"></div>
+      <div class="hint" id="riskSummary"></div>
+    </div>
+
+    <div class="card">
+      <label>Annotated image</label>
+      <img id="annotated" class="preview" alt="Annotated road image">
+    </div>
+
+    <div class="card" id="cropsCard">
+      <label>Defect close-ups</label>
+      <div class="crops" id="crops"></div>
+    </div>
+
+    <div class="card">
+      <label>Detections</label>
+      <table>
+        <thead><tr><th>#</th><th>Class</th><th>Conf.</th><th>Area %</th><th>Severity</th><th>Recommended remediation</th></tr></thead>
+        <tbody id="detBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <label>Raw JSON (payloads truncated)</label>
+      <pre id="raw"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const CONDITION_COLOUR = { Good:"var(--good)", Fair:"var(--fair)", Poor:"var(--poor)", Dangerous:"var(--danger)" };
+let lastReport = null;
+
+const apiBase = () => $("api").value.trim().replace(/\/+$/, "");
+
+function showError(message) {
+  $("error").textContent = message;
+  $("error").classList.remove("hidden");
+}
+
+$("ping").addEventListener("click", async () => {
+  $("healthOut").textContent = "Checking...";
+  try {
+    const res = await fetch(apiBase() + "/health");
+    const body = await res.json();
+    $("healthOut").textContent =
+      `${body.status} - model: ${body.model.name} (${body.model.status}), ` +
+      `classes: ${body.model.classes.join(", ") || "none"}, up ${body.uptime_seconds}s`;
+  } catch (err) {
+    $("healthOut").textContent = "Could not reach the API: " + err.message;
+  }
+});
+
+$("geo").addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    $("geoOut").textContent = "This browser does not expose geolocation.";
+    return;
+  }
+  $("geoOut").textContent = "Requesting location...";
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      $("lat").value = pos.coords.latitude.toFixed(6);
+      $("lon").value = pos.coords.longitude.toFixed(6);
+      $("geoOut").textContent = `Location captured (accuracy about ${Math.round(pos.coords.accuracy)} m).`;
+    },
+    (err) => { $("geoOut").textContent = "Location unavailable: " + err.message; },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+});
+
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("error").classList.add("hidden");
+  $("results").classList.add("hidden");
+
+  const button = $("submit");
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span>Analysing (first call can be slow)...';
+
+  try {
+    const form = new FormData();
+    form.append("image", $("file").files[0]);
+    form.append("latitude", $("lat").value);
+    form.append("longitude", $("lon").value);
+
+    const res = await fetch(apiBase() + "/analyze", { method: "POST", body: form });
+    const body = await res.json();
+
+    if (!res.ok || !body.success) {
+      showError(`${res.status} - ${body?.error?.message || "Request failed."}`);
+      return;
+    }
+    render(body);
+  } catch (err) {
+    showError("Network error: " + err.message + " (is the API running, and is CORS configured?)");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Analyse road";
+  }
+});
+
+function render(data) {
+  $("scoreVal").textContent = data.road_health_score.toFixed(2);
+  $("condVal").textContent = data.road_condition.toUpperCase();
+  $("condBox").style.background = CONDITION_COLOUR[data.road_condition] || "var(--muted)";
+
+  $("pct").textContent =
+    `${data.defect_percentage.toFixed(2)}% (method: ${data.area_breakdown.method}; ` +
+    `summed ${data.area_breakdown.summed_percentage}%, union ${data.area_breakdown.union_percentage}%)`;
+  $("count").textContent = data.total_defects;
+  $("counts").textContent =
+    Object.entries(data.defect_counts).map(([k, v]) => `${k}: ${v}`).join(", ") || "none";
+  $("modelInfo").textContent = `${data.model_info.name} (${data.model_info.status})`;
+  $("timing").textContent = `${data.processing_time_ms} ms`;
+  $("ref").textContent = data.request_id;
+
+  const warnBox = $("warnings");
+  warnBox.innerHTML = "";
+  (data.warnings || []).forEach((text) => {
+    const el = document.createElement("div");
+    el.className = "banner warn";
+    el.textContent = text;
+    warnBox.appendChild(el);
+  });
+
+  $("annotated").src = data.annotated_image
+    ? `data:${data.annotated_image.mime_type};base64,${data.annotated_image.data}`
+    : "";
+
+  $("detBody").innerHTML = data.detections.map((d) => `
+    <tr>
+      <td>#${d.id}</td>
+      <td>${d.class_name}</td>
+      <td>${(d.confidence * 100).toFixed(0)}%</td>
+      <td>${d.area_percentage.toFixed(2)}%</td>
+      <td class="sev" style="color:${d.severity_colour}">${d.severity}</td>
+      <td>${d.recommended_action}</td>
+    </tr>`).join("") || '<tr><td colspan="6">No defects detected.</td></tr>';
+
+  renderRisk(data.risk);
+  renderCrops(data);
+
+  const shallow = JSON.parse(JSON.stringify(data));
+  if (shallow.report) shallow.report.data = "<base64, " + shallow.report.size_bytes + " bytes>";
+  if (shallow.annotated_image) shallow.annotated_image.data = "<base64, " + shallow.annotated_image.size_bytes + " bytes>";
+  (shallow.defect_crops || []).forEach((c) => { c.data = "<base64, " + c.size_bytes + " bytes>"; });
+  $("raw").textContent = JSON.stringify(shallow, null, 2);
+
+  lastReport = data.report;
+  $("download").disabled = !lastReport;
+  $("results").classList.remove("hidden");
+}
+
+function renderRisk(risk) {
+  $("riskVal").textContent = risk.risk_index.toFixed(1);
+  $("riskLevel").textContent = risk.risk_level + " risk";
+  $("riskBox").style.background = risk.risk_colour;
+  $("riskTier").textContent = risk.priority_tier;
+  $("riskWindow").textContent = risk.response_window;
+  $("riskSummary").textContent = risk.summary;
+
+  // Four equal bands: Low 0-25, Moderate 25-50, High 50-75, Critical 75-100.
+  const bandColours = ["#1B7F3B", "#C2560F", "#B01B1B", "#8B0000"];
+  const activeBand = Math.min(3, Math.floor(risk.risk_index / 25));
+  $("riskMeter").innerHTML = bandColours
+    .map((colour, index) =>
+      `<span class="${index === activeBand ? "on" : ""}" style="background:${colour}"></span>`)
+    .join("");
+
+  $("riskComponents").innerHTML = risk.components.map((c) => `
+    <div class="comp">
+      <span>${c.name}</span>
+      <span class="track"><i style="width:${c.score}%;background:${risk.risk_colour}"></i></span>
+      <span><b>${c.score.toFixed(0)}</b>/100</span>
+      <span class="compnote">${c.value_display} &middot; weight ${Math.round(c.weight * 100)}%</span>
+    </div>`).join("");
+}
+
+function renderCrops(data) {
+  const crops = data.defect_crops || [];
+  $("cropsCard").classList.toggle("hidden", crops.length === 0);
+  $("crops").innerHTML = crops.map((crop, index) => {
+    const d = data.detections[index];
+    return `<figure>
+      <img src="data:${crop.mime_type};base64,${crop.data}" alt="Defect ${index + 1}">
+      <figcaption>Tag #${d ? d.id : index + 1} &middot; ${d ? d.class_name : ""}<br>${d ? d.severity : ""}</figcaption>
+    </figure>`;
+  }).join("");
+}
+
+$("download").addEventListener("click", () => {
+  if (!lastReport) return;
+  const bytes = Uint8Array.from(atob(lastReport.data), (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: lastReport.mime_type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = lastReport.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
