@@ -70,7 +70,7 @@ lowercase, human-readable words. `pothole` renders as "Pothole",
 pip install ultralytics
 
 yolo detect train \
-  model=yolov8n.pt \
+  model=yolo11n.pt \
   data=/content/dataset/data.yaml \
   epochs=100 \
   imgsz=640 \
@@ -85,13 +85,13 @@ Or the equivalent in Python:
 ```python
 from ultralytics import YOLO
 
-model = YOLO("yolov8n.pt")          # or "yolo11n.pt"
+model = YOLO("yolo11n.pt")          # or "yolov8n.pt"
 model.train(data="dataset/data.yaml", epochs=100, imgsz=640, batch=16, patience=20)
 ```
 
 Notes that matter for this project:
 
-* **Use a nano model** (`yolov8n.pt` or `yolo11n.pt`). `s`/`m`/`l` variants are
+* **Use a nano model** (`yolo11n.pt` or `yolov8n.pt`). `s`/`m`/`l` variants are
   more accurate but will not fit comfortably in 512 MB of RAM on Render's free
   tier, and CPU inference gets several times slower.
 * Start from the pretrained checkpoint (transfer learning). Training from

@@ -9,6 +9,10 @@
 weights/*.pt
 weights/*.onnx
 !weights/.gitkeep
+# YOLO11n best.pt is ~5.5 MB - small enough to commit, and Render deploys
+# the model straight from the repo. Without this exception the API would
+# silently fall back to the generic COCO model in production.
+!weights/best.pt
 
 # --- Python ----------------------------------------------------------------
 __pycache__/

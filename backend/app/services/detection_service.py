@@ -14,7 +14,7 @@ Model resolution order
    model.  This is the only mode whose output is meaningful for a real
    grievance report.
 2. If that file does not exist and ``ALLOW_PRETRAINED_FALLBACK=true``, a
-   generic pretrained model (``yolov8n.pt``) is downloaded and used instead.
+   generic pretrained model (``yolo11n.pt``) is downloaded and used instead.
    It detects COCO objects - person, car, bottle - and **cannot** detect
    potholes or cracks.  Every response produced in this mode is flagged, and
    the PDF is watermarked, so nobody mistakes it for a real assessment.

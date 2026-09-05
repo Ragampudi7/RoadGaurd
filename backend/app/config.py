@@ -161,13 +161,14 @@ class Settings(BaseSettings):
     # The fallback detects COCO objects (person, car, ...), NOT road defects,
     # so every response and PDF produced in this mode is clearly marked.
     allow_pretrained_fallback: bool = True
-    fallback_model_name: str = "yolov8n.pt"
+    fallback_model_name: str = "yolo11n.pt"
     confidence_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
     iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     max_detections: int = Field(default=100, ge=1, le=1000)
-    # Longest side YOLO runs on. 640 is the YOLOv8/v11 default and the
-    # sweet spot for CPU-only inference on a small instance.
-    inference_image_size: int = Field(default=640, ge=320, le=1280)
+    # Longest side YOLO runs on. Our weights/best.pt was TRAINED at 416,
+    # so serving at 416 matches train and inference. Measured 45.7 ms per
+    # image on CPU at this size. Change it only if you retrain to match.
+    inference_image_size: int = Field(default=416, ge=320, le=1280)
 
     # -- Upload limits ----------------------------------------------------
     max_image_size_mb: float = Field(default=10.0, gt=0.0, le=50.0)
