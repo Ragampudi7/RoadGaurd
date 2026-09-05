@@ -820,62 +820,18 @@ def build_report(ctx: Dict[str, Any]) -> bytes:
         ], width, padding=9))
 
         # ---------------- End of page 2: methodology ----------------------
-        story.append(Spacer(1, 4 * mm))
-        classes = ", ".join(ctx.get("model_classes") or []) or "not reported"
-        story.append(KeepTogether([
-            _heading("Methodology & Limitations", style, width),
-            Spacer(1, 2.5 * mm),
-            _card([
-                Paragraph(
-                    "<b>Detection.</b> %s object-detection model (%s), single-pass CPU "
-                    "inference at %d px, confidence threshold %.2f, NMS IoU %.2f. "
-                    "Classes: %s."
-                    % (escape(ctx["model_status"].replace("_", " ")).capitalize(),
-                       escape(ctx["model_name"]), ctx["inference_image_size"],
-                       ctx["confidence_threshold"], ctx["iou_threshold"], escape(classes)),
-                    style["note"]),
-                Spacer(1, 3),
-                Paragraph(
-                    "<b>Health score.</b> Defect area was measured by the '%s' method - summed "
-                    "bounding-box area %.2f%%, overlap-corrected union area %.2f%% - as a share "
-                    "of the %d x %d px frame. Road Health Score = 100 - defect percentage "
-                    "= %.2f."
-                    % (escape(ctx["area_method"]), ctx["summed_percentage"],
-                       ctx["union_percentage"], ctx["source_size"][0], ctx["source_size"][1],
-                       ctx["road_health_score"]), style["note"]),
-                Spacer(1, 3),
-                Paragraph(
-                    "<b>Risk index.</b> (%s) x hazard %.2f x confidence %.2f = %.2f, "
-                    "placing this location in the %s band (%s, %s). Severity of a single defect "
-                    "is banded by the share of the frame its box covers, and demoted one band "
-                    "when the model's confidence is below 0.40."
-                    % (escape(" + ".join("%.2f x %s" % (c.weight, c.name.lower())
-                                         for c in risk.components)),
-                       risk.hazard_factor, risk.confidence_factor, risk.risk_index,
-                       escape(risk.risk_level), escape(risk.priority_tier),
-                       escape(risk.response_window)), style["note"]),
-                Spacer(1, 3),
-                Paragraph(
-                    "<b>Limitations.</b> Every threshold, weight and band used above - the "
-                    "Good/Fair/Poor/Dangerous score bands, the severity bands, the class hazard "
-                    "weights and the risk bands - is defined by this project team for the "
-                    "purpose of this tool. None of them is taken from IRC, MoRTH, GHMC or any "
-                    "other official standard, and the recommended remediation is a starting "
-                    "point for the engineering wing rather than an engineering directive. A "
-                    "photograph carries no depth and no scale, so 'severity' reflects how much "
-                    "of the frame a defect occupies, not how deep it is, and the same defect "
-                    "photographed from a different distance will score differently. This "
-                    "document is an automated visual estimate from a single photograph and does "
-                    "not replace physical inspection by a qualified engineer.", style["note"]),
-            ], width, padding=9),
-        ]))
 
-        # ---------------- Page 3: visual evidence annex -------------------
+        # ------- Annex: close-ups first, annotated image last -------------
         if ctx.get("annotated_jpeg"):
             story.append(PageBreak())
-            story.append(_heading("Visual Evidence", style, width,
-                                  right="Annotated photographic record"))
-            story.append(Spacer(1, 2.5 * mm))
+
+            grid = _crop_grid(ctx, style, width)
+            if grid is not None:
+                story.append(_heading("Isolated Defect Close-Ups", style, width,
+                                      right="One crop per detection"))
+                story.append(Spacer(1, 2.5 * mm))
+                story.append(grid)
+                story.append(Spacer(1, 5 * mm))
 
             img_w, img_h = ctx["image_size"]
             display_w = width - 18
@@ -885,23 +841,30 @@ def build_report(ctx: Dict[str, Any]) -> bytes:
                 display_h = max_h
                 display_w = display_h * (img_w / float(img_h or 1))
 
-            story.append(_card([
-                RLImage(io.BytesIO(ctx["annotated_jpeg"]), width=display_w, height=display_h),
-                Spacer(1, 4),
-                Paragraph("<b>Figure 1.</b> Detected defects with class and confidence. Each "
-                          "label number matches a tag in the inventory on page 2. "
-                          "%d x %d px." % (img_w, img_h), style["cap"]),
-            ], width, padding=9))
-            story.append(Spacer(1, 4.5 * mm))
+            story.append(KeepTogether([
+                _heading("Visual Evidence", style, width,
+                         right="Annotated photographic record"),
+                Spacer(1, 2.5 * mm),
+                _card([
+                    RLImage(io.BytesIO(ctx["annotated_jpeg"]),
+                            width=display_w, height=display_h),
+                    Spacer(1, 4),
+                    Paragraph("<b>Figure 1.</b> Detected defects with class and confidence. "
+                              "Each label number matches a tag in the defect inventory. "
+                              "%d x %d px." % (img_w, img_h), style["cap"]),
+                ], width, padding=9),
+            ]))
 
-            grid = _crop_grid(ctx, style, width)
-            if grid is not None:
-                story.append(_heading("Isolated Defect Close-Ups", style, width,
-                                      right="One crop per detection"))
-                story.append(Spacer(1, 2.5 * mm))
-                # No trailing spacer: the grid can end flush with the frame,
-                # and a spacer there would spill an otherwise empty page.
-                story.append(grid)
+            # The full methodology annex was removed, but a report addressed to a
+            # municipal body must still say what it is and is not. Keep this.
+            story.append(Spacer(1, 3 * mm))
+            story.append(Paragraph(
+                "Automated visual estimate from a single photograph. The score, severity and "
+                "risk thresholds used in this report are defined by this project and are not "
+                "taken from IRC, MoRTH, GHMC or any other official standard. A photograph "
+                "carries no depth or scale, so severity reflects the share of the frame a "
+                "defect occupies, not how deep it is. This report does not replace physical "
+                "inspection by a qualified engineer.", style["note"]))
 
         doc.build(story)
         return buffer.getvalue()
