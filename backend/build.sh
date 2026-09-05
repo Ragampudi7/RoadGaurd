@@ -26,8 +26,8 @@ pip install --force-reinstall --no-deps "opencv-python-headless>=4.10.0,<5.0.0"
 # 4. Pre-download the fallback model during the build rather than on the first
 #    request, so a cold start never blocks on a network download.
 if [ "${ALLOW_PRETRAINED_FALLBACK:-true}" = "true" ] && [ ! -f "${MODEL_PATH:-weights/best.pt}" ]; then
-  echo "Pre-downloading fallback model ${FALLBACK_MODEL_NAME:-yolov8n.pt} ..."
-  python -c "from ultralytics import YOLO; YOLO('${FALLBACK_MODEL_NAME:-yolov8n.pt}')" || true
+  echo "Pre-downloading fallback model ${FALLBACK_MODEL_NAME:-yolo11n.pt} ..."
+  python -c "from ultralytics import YOLO; YOLO('${FALLBACK_MODEL_NAME:-yolo11n.pt}')" || true
 fi
 
 echo "Build complete."

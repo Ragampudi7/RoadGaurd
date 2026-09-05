@@ -64,10 +64,35 @@ That is the whole procedure - `MODEL_PATH=weights/best.pt` is the default, and t
 model is loaded once when the server starts. After training with Ultralytics the
 file you want is `runs/detect/train/weights/best.pt`; copy it across.
 
+### The shipped model
+
+`weights/best.pt` is a YOLO11n detector (5.5 MB) trained on 3,224 images merged
+from two Roboflow datasets - 2,309 train / 601 val / 314 test - with two classes,
+`pothole` and `crack`.
+
+Measured on the **held-out test split** (314 images, never used for model
+selection). These are the real numbers, not targets:
+
+| | mAP50 | mAP50-95 | precision | recall |
+|---|---|---|---|---|
+| overall | 0.520 | 0.220 | 0.602 | 0.502 |
+| pothole | 0.518 | - | 0.497 | 0.552 |
+| crack | 0.521 | - | 0.707 | 0.452 |
+
+**Read this before quoting the model.** It was trained for only 8 epochs, so it
+finds roughly half the defects present and about 40% of what it reports is a
+false positive. In practice it reliably catches large, obvious potholes and
+frequently mislabels thin linear cracks as potholes. It is a working prototype
+detector suitable for demonstrating the pipeline - it is not a production
+detector, and no claim of field accuracy should be made from it.
+
+`train_yolo11_colab.ipynb` retrains it properly on a free GPU (100 epochs at
+640 px, ~40 min). If you retrain at 640, set `INFERENCE_IMAGE_SIZE=640` to match.
+
 ### Running before `best.pt` exists
 
 `ALLOW_PRETRAINED_FALLBACK=true` (the default) lets the server start with the
-generic pretrained `yolov8n.pt`, which Ultralytics downloads automatically on
+generic pretrained `yolo11n.pt`, which Ultralytics downloads automatically on
 first use. This exists **only so the frontend can be built and tested** while the
 model is still being trained.
 
@@ -535,7 +560,7 @@ to `.env` for local development. On Render, set these in the dashboard or in
 | `LOG_LEVEL` | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL` |
 | `MODEL_PATH` | `weights/best.pt` | trained weights, relative to `backend/` |
 | `ALLOW_PRETRAINED_FALLBACK` | `true` | use a generic model when weights are missing |
-| `FALLBACK_MODEL_NAME` | `yolov8n.pt` | which generic model (`yolo11n.pt` also works) |
+| `FALLBACK_MODEL_NAME` | `yolo11n.pt` | which generic model (`yolov8n.pt` also works) |
 | `CONFIDENCE_THRESHOLD` | `0.25` | minimum confidence to keep a detection |
 | `IOU_THRESHOLD` | `0.45` | NMS IoU threshold |
 | `MAX_DETECTIONS` | `100` | hard cap per image |
@@ -675,7 +700,7 @@ A free instance is **0.1 CPU (shared) and 512 MB RAM**. Measured expectations:
 | | |
 |---|---|
 | Cold start after sleep | **50-90 s** - free instances sleep after 15 min idle, and the whole Python + torch + model load happens on the first request |
-| Warm inference (YOLOv8n, 640 px, CPU) | **1.5-4 s** per image |
+| Warm inference (YOLO11n, 416 px, CPU) | **~46 ms** per image (measured on the shipped `best.pt`) |
 | Full request (inference + annotation + PDF) | **2-6 s** |
 | Memory at rest | ~350-450 MB, uncomfortably close to the 512 MB ceiling |
 | Concurrency | effectively **one image at a time** |

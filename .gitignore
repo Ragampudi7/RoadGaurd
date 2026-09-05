@@ -6,3 +6,9 @@
 
 # leftover git temp files (safe to delete this folder)
 _git_scratch_to_delete/
+
+# --- Training data / artifacts (regenerable) ---
+datasets/
+*.zip
+*.tgz
+runs/

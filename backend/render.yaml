@@ -26,13 +26,13 @@ services:
       - key: ALLOW_PRETRAINED_FALLBACK
         value: "true"          # set to "false" once weights/best.pt is committed
       - key: FALLBACK_MODEL_NAME
-        value: yolov8n.pt
+        value: yolo11n.pt
       - key: CONFIDENCE_THRESHOLD
         value: "0.25"
       - key: IOU_THRESHOLD
         value: "0.45"
       - key: INFERENCE_IMAGE_SIZE
-        value: "640"
+        value: "416"
       - key: MAX_IMAGE_SIZE_MB
         value: "10"
       - key: AREA_METHOD
