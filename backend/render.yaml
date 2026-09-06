@@ -32,7 +32,7 @@ services:
       - key: IOU_THRESHOLD
         value: "0.45"
       - key: INFERENCE_IMAGE_SIZE
-        value: "416"
+        value: "640"
       - key: MAX_IMAGE_SIZE_MB
         value: "10"
       - key: AREA_METHOD
