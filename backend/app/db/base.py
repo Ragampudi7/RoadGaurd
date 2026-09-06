@@ -25,18 +25,39 @@ _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 def normalise_url(url: str) -> str:
     """
-    Managed providers hand out libpq-style URLs; SQLAlchemy needs the asyncpg
-    driver named explicitly. Aiven also appends ?sslmode=require, which asyncpg
-    does not accept as a query parameter — it is passed via connect_args instead.
+    Turn whatever a managed provider hands out into a URL SQLAlchemy accepts.
+
+    Handles three things that bite in practice:
+
+    * Wrapper characters. Aiven's console renders the Service URI inside angle
+      brackets and they come along with the copy, so ``<postgres://...>`` is a
+      very common paste. Quotes from a shell-quoted .env line likewise.
+    * Driver prefix. ``postgres://`` and ``postgresql://`` both need to become
+      ``postgresql+asyncpg://``.
+    * libpq-only query parameters. asyncpg rejects ``sslmode`` as a DSN
+      parameter; TLS is passed through connect_args instead.
     """
-    if url.startswith("postgres://"):
-        url = "postgresql+asyncpg://" + url[len("postgres://"):]
-    elif url.startswith("postgresql://"):
-        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
-    # strip libpq-only params asyncpg rejects
-    for junk in ("?sslmode=require", "&sslmode=require", "?ssl=true", "&ssl=true"):
-        url = url.replace(junk, "")
-    return url
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    url = url.strip().strip("<>").strip("'\"").strip()
+
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            url = "postgresql+asyncpg://" + url[len(prefix):]
+            break
+
+    # Drop libpq-only params rather than string-replacing, so an unusual
+    # ordering or an extra parameter does not slip through.
+    parts = urlsplit(url)
+    keep = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+            if k.lower() not in {"sslmode", "ssl", "sslrootcert", "channel_binding"}]
+    return urlunsplit(parts._replace(query=urlencode(keep)))
+
+
+def wants_tls(raw_url: str) -> bool:
+    """True when the original URL asked for TLS, before it was normalised."""
+    low = raw_url.lower()
+    return "sslmode=require" in low or "ssl=true" in low or "aivencloud.com" in low
 
 
 def database_enabled(settings) -> bool:
@@ -52,8 +73,8 @@ def init_engine(settings) -> AsyncEngine | None:
     raw = settings.database_url
     url = normalise_url(raw)
     connect_args = {}
-    # Aiven requires TLS. asyncpg takes ssl= in connect_args, not in the URL.
-    if "sslmode=require" in raw or "aivencloud.com" in raw:
+    # asyncpg takes ssl= in connect_args, not as a DSN parameter.
+    if wants_tls(raw):
         connect_args["ssl"] = "require"
 
     _engine = create_async_engine(
