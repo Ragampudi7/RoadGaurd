@@ -1,21 +1,41 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import Analyze from "./pages/Analyze";
-import { History, MapView, Admin, Analytics } from "./pages/Placeholders";
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
+import DashboardLayout from "./components/DashboardLayout";
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Upload from "./pages/app/Upload";
+import DetectionResult from "./pages/app/DetectionResult";
+import Reports from "./pages/app/Reports";
+import Profile from "./pages/app/Profile";
+
+/* Recharts and Leaflet are the two heaviest dependencies and neither is needed
+   to render the landing page, so they load only when their route is opened. */
+const Dashboard = lazy(() => import("./pages/app/Dashboard"));
+const MapView = lazy(() => import("./pages/app/MapView"));
+
+const Loading = () => (
+  <div className="glass grid place-items-center p-12 text-sm text-[color:var(--color-muted)]">Loading…</div>
+);
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<Analyze />} />
-          <Route path="history" element={<History />} />
-          <Route path="map" element={<MapView />} />
-          <Route path="admin" element={<Admin />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="*" element={<Analyze />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+
+      <Route path="/app" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+        <Route index element={<Suspense fallback={<Loading />}><Dashboard /></Suspense>} />
+        <Route path="upload" element={<Upload />} />
+        <Route path="result" element={<DetectionResult />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="map" element={<Suspense fallback={<Loading />}><MapView /></Suspense>} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

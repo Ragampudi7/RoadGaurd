@@ -1,92 +1,92 @@
-import { CONDITION_COLOUR, RISK_COLOUR, SEVERITY_COLOUR } from "../api";
-import "./results.css";
+import { CONDITION_COLOUR, RISK_COLOUR, SEVERITY_COLOUR } from "../lib/mockData";
 
 /* ---------------------------------------------------------------- gauge --
-   Same 3/4-circle arc as the PDF report's Road Health Index, so the screen
-   and the printed grievance look like one document. Score runs 0-100 and
-   higher is better, which is the opposite direction to the risk meter. */
-export function ScoreGauge({ score, condition, size = 168 }) {
+   Same 270-degree arc as the PDF report's Road Health Index, so the screen and
+   the printed grievance read as one document. Score runs 0-100, higher better —
+   the opposite direction to the risk meter, which is worth noticing. */
+export function ScoreGauge({ score, condition, size = 180 }) {
   const stroke = 14;
   const r = (size - stroke) / 2;
-  const cx = size / 2;
-  const cy = size / 2;
-  const SWEEP = 270; // degrees of arc
-  const START = 135; // start angle, bottom-left
+  const c = size / 2;
+  const SWEEP = 270, START = 135;
 
   const polar = (deg) => {
     const rad = ((deg - 90) * Math.PI) / 180;
-    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+    return [c + r * Math.cos(rad), c + r * Math.sin(rad)];
   };
-  const arc = (fromDeg, toDeg) => {
-    const [x1, y1] = polar(fromDeg);
-    const [x2, y2] = polar(toDeg);
-    const large = toDeg - fromDeg > 180 ? 1 : 0;
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+  const arc = (a, b) => {
+    const [x1, y1] = polar(a), [x2, y2] = polar(b);
+    return `M ${x1} ${y1} A ${r} ${r} 0 ${b - a > 180 ? 1 : 0} 1 ${x2} ${y2}`;
   };
 
   const pct = Math.max(0, Math.min(100, Number(score ?? 0))) / 100;
-  const colour = CONDITION_COLOUR[condition] ?? "var(--muted)";
+  const colour = CONDITION_COLOUR[condition] ?? "var(--color-muted)";
 
   return (
-    <div className="gauge">
+    <div className="relative grid place-items-center">
       <svg width={size} height={size} role="img"
-           aria-label={`Road health score ${score} out of 100, condition ${condition}`}>
-        <path d={arc(START, START + SWEEP)} fill="none" stroke="var(--line)"
+           aria-label={`Road health score ${score} of 100, condition ${condition}`}>
+        <path d={arc(START, START + SWEEP)} fill="none" stroke="rgb(255 255 255 / .1)"
               strokeWidth={stroke} strokeLinecap="round" />
         {pct > 0 && (
           <path d={arc(START, START + SWEEP * pct)} fill="none" stroke={colour}
                 strokeWidth={stroke} strokeLinecap="round" />
         )}
       </svg>
-      <div className="gaugetext">
-        <b style={{ color: colour }}>{Number(score ?? 0).toFixed(2)}</b>
-        <small>out of 100</small>
+      <div className="absolute top-[41%] -translate-y-1/2 text-center">
+        <div className="text-[32px] font-semibold leading-none" style={{ color: colour }}>
+          {Number(score ?? 0).toFixed(2)}
+        </div>
+        <div className="mt-1 text-[11px] text-[color:var(--color-muted)]">out of 100</div>
       </div>
-      <div className="chip" style={{ background: colour }}>{condition}</div>
+      <span className="chip absolute bottom-1 text-white" style={{ background: colour }}>
+        {condition}
+      </span>
     </div>
   );
 }
 
 /* ----------------------------------------------------------------- risk --
-   Shows the weighted components too. Without them the index is a number the
-   user has to take on faith; with them it is auditable. */
+   The weighted components are shown, not just the index. Without them the
+   number has to be taken on faith; with them it can be checked. */
 export function RiskPanel({ risk }) {
   if (!risk) return null;
-  const colour = RISK_COLOUR[risk.risk_level] ?? "var(--muted)";
+  const colour = RISK_COLOUR[risk.risk_level] ?? "var(--color-muted)";
   return (
-    <div className="card stack">
-      <div className="riskhead">
-        <div className="riskbig" style={{ borderColor: colour }}>
-          <b style={{ color: colour }}>{risk.risk_index?.toFixed(1)}</b>
-          <small>Risk index / 100</small>
+    <div className="glass grid gap-5 p-5">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="rounded-2xl border-2 px-5 py-3 text-center" style={{ borderColor: colour }}>
+          <div className="text-3xl font-semibold leading-none" style={{ color: colour }}>
+            {risk.risk_index?.toFixed(1)}
+          </div>
+          <div className="mt-1 text-[11px] text-[color:var(--color-muted)]">Risk index / 100</div>
         </div>
         <div>
-          <div className="chip solid" style={{ background: colour }}>{risk.risk_level} risk</div>
-          <div className="small" style={{ marginTop: 8 }}>
-            <strong>{risk.priority_tier}</strong>
-          </div>
-          <div className="small muted">{risk.response_window}</div>
+          <span className="chip text-white" style={{ background: colour }}>{risk.risk_level} risk</span>
+          <div className="mt-2 text-sm font-semibold">{risk.priority_tier}</div>
+          <div className="text-xs text-[color:var(--color-muted)]">{risk.response_window}</div>
         </div>
       </div>
 
       {risk.components?.length > 0 && (
-        <div className="components">
+        <div className="grid gap-3">
           {risk.components.map((c) => (
-            <div className="comp" key={c.name}>
-              <div className="complabel">
+            <div key={c.name}>
+              <div className="flex justify-between text-[13px] font-medium">
                 <span>{c.name}</span>
-                <span className="muted small">weight {(c.weight * 100).toFixed(0)}%</span>
+                <span className="text-[color:var(--color-muted)]">weight {(c.weight * 100).toFixed(0)}%</span>
               </div>
-              <div className="track">
-                <div className="fill" style={{ width: `${Math.min(100, c.value)}%`, background: colour }} />
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full transition-all"
+                     style={{ width: `${Math.min(100, c.value)}%`, background: colour }} />
               </div>
-              <div className="small muted">{c.detail ?? ""}</div>
+              {c.detail && <div className="mt-1 text-xs text-[color:var(--color-muted)]">{c.detail}</div>}
             </div>
           ))}
         </div>
       )}
 
-      <p className="small muted" style={{ margin: 0 }}>{risk.summary}</p>
+      <p className="text-[13px] leading-relaxed text-[color:var(--color-muted)]">{risk.summary}</p>
     </div>
   );
 }
@@ -94,40 +94,41 @@ export function RiskPanel({ risk }) {
 /* ----------------------------------------------------------- detections -- */
 export function DetectionTable({ detections }) {
   if (!detections?.length) {
-    return <p className="muted small">No defects were detected in this photograph.</p>;
+    return <p className="text-sm text-[color:var(--color-muted)]">No defects were detected in this photograph.</p>;
   }
   return (
-    <div className="scroll-x">
-      <table>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
         <thead>
-          <tr>
-            <th>Tag</th><th>Class</th><th>Confidence</th>
-            <th>Severity</th><th>Frame area</th><th>Recommended action</th>
+          <tr className="text-left text-[11px] uppercase tracking-wider text-[color:var(--color-muted)]">
+            <th className="py-2 pr-3 font-semibold">Tag</th>
+            <th className="py-2 pr-3 font-semibold">Class</th>
+            <th className="py-2 pr-3 font-semibold">Confidence</th>
+            <th className="py-2 pr-3 font-semibold">Severity</th>
+            <th className="py-2 pr-3 font-semibold">Frame area</th>
+            <th className="py-2 font-semibold">Recommended action</th>
           </tr>
         </thead>
         <tbody>
           {detections.map((d) => (
-            <tr key={d.id}>
-              <td className="mono">#{d.id}</td>
-              <td>{d.class_name}</td>
-              <td>
-                <div className="confbar">
-                  <div className="track sm">
-                    <div className="fill" style={{
-                      width: `${d.confidence * 100}%`,
-                      background: SEVERITY_COLOUR[d.severity] ?? "var(--muted)",
-                    }} />
+            <tr key={d.id} className="border-t border-white/8">
+              <td className="py-2.5 pr-3 font-mono text-xs">#{d.id}</td>
+              <td className="py-2.5 pr-3">{d.class_name}</td>
+              <td className="py-2.5 pr-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full"
+                         style={{ width: `${d.confidence * 100}%`,
+                                  background: SEVERITY_COLOUR[d.severity] ?? "var(--color-muted)" }} />
                   </div>
-                  <span className="mono small">{(d.confidence * 100).toFixed(0)}%</span>
+                  <span className="font-mono text-xs">{(d.confidence * 100).toFixed(0)}%</span>
                 </div>
               </td>
-              <td>
-                <span className="sev" style={{ color: SEVERITY_COLOUR[d.severity] }}>
-                  {d.severity}
-                </span>
+              <td className="py-2.5 pr-3 font-semibold" style={{ color: SEVERITY_COLOUR[d.severity] }}>
+                {d.severity}
               </td>
-              <td className="mono">{d.area_percentage?.toFixed(2)}%</td>
-              <td className="small">{d.recommended_action}</td>
+              <td className="py-2.5 pr-3 font-mono text-xs">{d.area_percentage?.toFixed(2)}%</td>
+              <td className="py-2.5 text-xs text-[color:var(--color-muted)]">{d.recommended_action}</td>
             </tr>
           ))}
         </tbody>

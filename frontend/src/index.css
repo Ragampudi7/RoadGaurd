@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------- theme --
+   Dark-first. Glass needs something behind it, so the app sits on a dark
+   asphalt photograph and every panel is a frosted sheet over it.
+   Condition/risk colours mirror backend/app/config.py so the UI, the
+   annotated image and the PDF report share one palette. */
+@theme {
+  --color-ink: #e8ebf0;
+  --color-muted: #9aa3b2;
+  --color-line: rgb(255 255 255 / 0.12);
+
+  --color-brand: #4a9eff;
+  --color-brand-deep: #1a5fa8;
+
+  --color-good: #35c46a;
+  --color-fair: #e0a92b;
+  --color-poor: #f0803c;
+  --color-danger: #ef4a4a;
+
+  --color-critical: #ef4a4a;
+  --color-high: #f0803c;
+  --color-medium: #e0a92b;
+  --color-minor: #8b95a6;
+}
+
+@layer base {
+  html { color-scheme: dark; }
+  body {
+    @apply text-[15px] leading-relaxed antialiased;
+    color: var(--color-ink);
+    background: #0a0d12;
+    min-height: 100vh;
+  }
+  /* the road photograph behind everything */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(1200px 700px at 70% -10%, rgb(74 158 255 / 0.16), transparent 60%),
+      linear-gradient(180deg, rgb(10 13 18 / 0.72), rgb(10 13 18 / 0.94)),
+      url("/img/hero.webp") center/cover no-repeat fixed;
+    z-index: -1;
+  }
+  ::selection { background: rgb(74 158 255 / 0.32); }
+}
+
+@layer components {
+  /* --- glass primitives ------------------------------------------------
+     Two weights: `glass` for panels that hold content, `glass-soft` for
+     chrome that should recede. backdrop-blur is the whole effect, so each
+     needs a translucent (never opaque) background. */
+  .glass {
+    @apply rounded-2xl border;
+    background: rgb(255 255 255 / 0.055);
+    border-color: var(--color-line);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.07) inset,
+                0 12px 40px -12px rgb(0 0 0 / 0.6);
+  }
+  .glass-soft {
+    @apply rounded-xl border;
+    background: rgb(255 255 255 / 0.035);
+    border-color: rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .glass-hover {
+    transition: background .25s ease, border-color .25s ease, transform .25s ease;
+  }
+  .glass-hover:hover {
+    background: rgb(255 255 255 / 0.085);
+    border-color: rgb(255 255 255 / 0.2);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
+           text-sm font-semibold transition cursor-pointer border border-transparent;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--color-brand), var(--color-brand-deep));
+    @apply text-white shadow-lg;
+    box-shadow: 0 8px 24px -8px rgb(74 158 255 / 0.7);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost {
+    background: rgb(255 255 255 / 0.06);
+    border-color: var(--color-line);
+    @apply text-[color:var(--color-ink)];
+  }
+  .btn-ghost:hover { background: rgb(255 255 255 / 0.12); }
+  .btn:disabled { @apply opacity-45 cursor-not-allowed; }
+
+  .field {
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm outline-none border transition;
+    background: rgb(255 255 255 / 0.05);
+    border-color: var(--color-line);
+    color: var(--color-ink);
+  }
+  .field:focus { border-color: rgb(74 158 255 / 0.65); background: rgb(255 255 255 / 0.08); }
+  .field::placeholder { color: rgb(154 163 178 / 0.65); }
+
+  .label { @apply block text-xs font-semibold mb-1.5 text-[color:var(--color-muted)]; }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1
+           text-[11px] font-bold uppercase tracking-wider;
+  }
+
+  /* demo-mode marker. The app can generate a grievance PDF addressed to a
+     municipal body, so fabricated numbers must never look official. */
+  .demo-stripe {
+    background-image: repeating-linear-gradient(
+      45deg, rgb(224 169 43 / 0.14) 0 10px, transparent 10px 20px);
+  }
+}
+
+/* leaflet sits on dark glass; its default light chrome fights that */
+.leaflet-container { background: #0d1117; border-radius: 1rem; font: inherit; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: rgb(20 24 32 / 0.96); color: var(--color-ink);
+  backdrop-filter: blur(12px); border: 1px solid var(--color-line);
+}
+.leaflet-control-zoom a { background: rgb(20 24 32 / .9) !important; color: #e8ebf0 !important; border-color: rgb(255 255 255/.12) !important; }
+.leaflet-bar { border: none !important; }
