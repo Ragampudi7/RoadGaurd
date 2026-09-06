@@ -1,0 +1,68 @@
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brandmark { display: flex; align-items: center; gap: 10px; }
+.brandmark .dot {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: linear-gradient(140deg, var(--brand), var(--accent));
+  flex: none;
+}
+
+.nav { display: flex; gap: 2px; flex-wrap: wrap; margin-left: auto; }
+.navlink {
+  padding: 7px 13px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.navlink:hover { background: var(--bg); color: var(--ink); }
+.navlink.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.apistatus { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.apistatus .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.apistatus.ok .pip { background: var(--good); }
+.apistatus.warn .pip { background: var(--fair); }
+.apistatus.bad .pip { background: var(--danger); }
+.apistatus.warn, .apistatus.bad { color: var(--ink); }
+
+.main { flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; padding: 24px 20px 40px; }
+.foot {
+  max-width: 1080px; margin: 0 auto; padding: 18px 20px 32px;
+  border-top: 1px solid var(--line); line-height: 1.5;
+}
+
+.pagehead { margin: 0 0 4px; font-size: 21px; }
+.pagesub { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.stack { display: grid; gap: 16px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 190px; }
+
+@media (max-width: 760px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .nav { order: 3; width: 100%; margin-left: 0; }
+}
+
+/* placeholder shown by screens that need the database */
+.pending {
+  display: grid; gap: 10px; place-items: start;
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  padding: 26px; color: var(--muted);
+}
+.pending h3 { margin: 0; color: var(--ink); font-size: 16px; }
+.pending code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }

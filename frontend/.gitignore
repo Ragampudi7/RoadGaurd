@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+shot_*.png
+e2e_check.py
