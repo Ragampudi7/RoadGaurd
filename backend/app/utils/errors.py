@@ -123,3 +123,62 @@ class ServerBusyError(AppError):
     status_code = 503
     error_code = "server_busy"
     message = "The server is busy processing other images. Please retry shortly."
+
+
+# ---------------------------------------------------------------------------
+# Accounts, sessions and persistence
+# ---------------------------------------------------------------------------
+
+
+class UnauthenticatedError(AppError):
+    status_code = 401
+    error_code = "unauthenticated"
+    message = "Sign in to continue."
+
+
+class InvalidTokenError(AppError):
+    status_code = 401
+    error_code = "invalid_token"
+    message = "Your session has expired. Sign in again."
+
+
+class InvalidCredentialsError(AppError):
+    status_code = 401
+    error_code = "invalid_credentials"
+    # Deliberately identical whether the email is unknown or the password is
+    # wrong: two different messages turn the login form into an oracle for
+    # discovering which addresses have accounts.
+    message = "Email or password is incorrect."
+
+
+class EmailTakenError(AppError):
+    status_code = 409
+    error_code = "email_taken"
+    message = "An account with that email already exists."
+
+
+class AccountDisabledError(AppError):
+    status_code = 403
+    error_code = "account_disabled"
+    message = "This account is disabled."
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+    error_code = "forbidden"
+    message = "You do not have permission to do that."
+
+
+class NotFoundError(AppError):
+    status_code = 404
+    error_code = "not_found"
+    message = "That record does not exist."
+
+
+class DatabaseUnavailableError(AppError):
+    status_code = 503
+    error_code = "database_unavailable"
+    message = (
+        "Persistence is not configured on this server. Analysis still works, "
+        "but reports cannot be saved."
+    )

@@ -165,10 +165,10 @@ class Settings(BaseSettings):
     confidence_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
     iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     max_detections: int = Field(default=100, ge=1, le=1000)
-    # Longest side YOLO runs on. Our weights/best.pt was TRAINED at 640,
-    # so serving at 640 matches train and inference. Measured 31 ms per
-    # image on a T4 at this size. Change it only if you retrain to match.
-    inference_image_size: int = Field(default=640, ge=320, le=1280)
+    # Longest side YOLO runs on. Our weights/best.pt was TRAINED at 416,
+    # so serving at 416 matches train and inference. Measured 45.7 ms per
+    # image on CPU at this size. Change it only if you retrain to match.
+    inference_image_size: int = Field(default=416, ge=320, le=1280)
 
     # -- Upload limits ----------------------------------------------------
     max_image_size_mb: float = Field(default=10.0, gt=0.0, le=50.0)
@@ -233,6 +233,19 @@ class Settings(BaseSettings):
         if value not in allowed:
             raise ValueError("LOG_LEVEL must be one of " + ", ".join(sorted(allowed)))
         return value
+
+    # -- Database (optional) ----------------------------------------------
+    # Unset means persistence is disabled and /analyze still works. Managed
+    # providers hand out postgres:// or postgresql:// URLs with ?sslmode=require;
+    # both are normalised for asyncpg in app/db/base.py.
+    database_url: str | None = None
+
+    # -- Auth ---------------------------------------------------------------
+    # MUST be set in production. The default below is a development convenience
+    # only: a known secret means anyone can mint a valid token, so the app
+    # refuses to start with it when ENVIRONMENT=production.
+    jwt_secret: str = "dev-only-insecure-secret-change-me"
+    jwt_expires_hours: int = Field(default=72, ge=1, le=720)
 
     # -- Derived helpers --------------------------------------------------
     @property

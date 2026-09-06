@@ -35,3 +35,14 @@ reportlab>=4.2.0,<6.0.0
 torch>=2.5.0,<3.0.0                    # see the install-order note above
 torchvision>=0.20.0,<1.0.0
 ultralytics>=8.3.0,<9.0.0              # YOLO11 inference (8.3.0+ ships yolo11n)
+
+# --- Persistence (optional; unset DATABASE_URL disables the whole layer) ----
+sqlalchemy[asyncio]>=2.0,<3.0
+asyncpg>=0.29                          # async driver; Aiven URLs are normalised in app/db/base.py
+alembic>=1.13                          # migrations
+greenlet>=3.0                          # required by SQLAlchemy's async bridge
+
+# --- Auth ------------------------------------------------------------------
+bcrypt>=4.1                            # password hashing
+pyjwt>=2.8                             # session tokens
+email-validator>=2.1                   # pydantic EmailStr

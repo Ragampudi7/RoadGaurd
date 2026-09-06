@@ -22,6 +22,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.routes import router
 from app.config import get_settings
 from app.services.detection_service import get_detector
+from app.api.auth import router as auth_router
+from app.api.reports import router as reports_router
+from app.db.base import create_all, database_enabled, dispose_engine, init_engine
 from app.utils.errors import AppError
 from app.utils.logging_config import configure_logging, get_logger
 
@@ -52,6 +55,28 @@ async def lifespan(app: FastAPI):
                 settings.confidence_threshold, settings.iou_threshold, settings.area_method)
     logger.info("CORS origins: %s", ", ".join(settings.cors_origins))
 
+    # Persistence is optional. If DATABASE_URL is unset the API still serves
+    # /analyze exactly as before; only the report endpoints answer 503.
+    if database_enabled(settings):
+        if settings.environment == "production":
+            if settings.jwt_secret == "dev-only-insecure-secret-change-me":
+                raise RuntimeError(
+                    "JWT_SECRET is still the development default. Anyone could mint "
+                    "a valid session token. Set JWT_SECRET before deploying."
+                )
+            # HS256 keys shorter than the hash output weaken the signature;
+            # RFC 7518 3.2 puts the floor at 32 bytes.
+            if len(settings.jwt_secret.encode()) < 32:
+                raise RuntimeError(
+                    "JWT_SECRET must be at least 32 bytes. Generate one with: "
+                    "python3 -c \"import secrets; print(secrets.token_urlsafe(48))\""
+                )
+        init_engine(settings)
+        await create_all()
+        logger.info("Persistence enabled")
+    else:
+        logger.info("DATABASE_URL not set - reports will not be persisted")
+
     detector = get_detector()
     detector.load()
     if not detector.is_ready:
@@ -61,6 +86,7 @@ async def lifespan(app: FastAPI):
         )
     yield
     detector.unload()
+    await dispose_engine()
     logger.info("Shutdown complete")
 
 
@@ -90,6 +116,8 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=2048)
 
 app.include_router(router)
+app.include_router(auth_router)
+app.include_router(reports_router)
 
 
 # ---------------------------------------------------------------------------
