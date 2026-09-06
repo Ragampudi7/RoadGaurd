@@ -165,10 +165,10 @@ class Settings(BaseSettings):
     confidence_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
     iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     max_detections: int = Field(default=100, ge=1, le=1000)
-    # Longest side YOLO runs on. Our weights/best.pt was TRAINED at 416,
-    # so serving at 416 matches train and inference. Measured 45.7 ms per
-    # image on CPU at this size. Change it only if you retrain to match.
-    inference_image_size: int = Field(default=416, ge=320, le=1280)
+    # Longest side YOLO runs on. Our weights/best.pt was TRAINED at 640,
+    # so serving at 640 matches train and inference. Measured 31 ms per
+    # image on a T4 at this size. Change it only if you retrain to match.
+    inference_image_size: int = Field(default=640, ge=320, le=1280)
 
     # -- Upload limits ----------------------------------------------------
     max_image_size_mb: float = Field(default=10.0, gt=0.0, le=50.0)

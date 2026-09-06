@@ -68,26 +68,26 @@ file you want is `runs/detect/train/weights/best.pt`; copy it across.
 
 `weights/best.pt` is a YOLO11n detector (5.5 MB) trained on 3,224 images merged
 from two Roboflow datasets - 2,309 train / 601 val / 314 test - with two classes,
-`pothole` and `crack`.
+`pothole` and `crack`. Trained 100 epochs at 640 px on a Colab T4; the notebook
+that produced it is `train_yolo11_colab.ipynb`.
 
-Measured on the **held-out test split** (314 images, never used for model
-selection). These are the real numbers, not targets:
+Measured on the **held-out test split** (314 images / 595 instances, never used
+for model selection or early stopping):
 
 | | mAP50 | mAP50-95 | precision | recall |
 |---|---|---|---|---|
-| overall | 0.520 | 0.220 | 0.602 | 0.502 |
-| pothole | 0.518 | - | 0.497 | 0.552 |
-| crack | 0.521 | - | 0.707 | 0.452 |
+| **overall** | **0.796** | **0.503** | **0.847** | **0.719** |
+| pothole | 0.878 | - | 0.878 | 0.780 |
+| crack | 0.714 | - | 0.816 | 0.658 |
 
-**Read this before quoting the model.** It was trained for only 8 epochs, so it
-finds roughly half the defects present and about 40% of what it reports is a
-false positive. In practice it reliably catches large, obvious potholes and
-frequently mislabels thin linear cracks as potholes. It is a working prototype
-detector suitable for demonstrating the pipeline - it is not a production
-detector, and no claim of field accuracy should be made from it.
+Read honestly: it finds roughly three quarters of the defects present, and about
+15% of what it reports is a false positive. Potholes are detected more reliably
+than cracks, and recall on cracks (0.658) is the weakest number - thin or distant
+cracks are still missed. Good enough to drive a triage tool; not a substitute for
+inspection, and no claim of field accuracy should be made from it.
 
-`train_yolo11_colab.ipynb` retrains it properly on a free GPU (100 epochs at
-640 px, ~40 min). If you retrain at 640, set `INFERENCE_IMAGE_SIZE=640` to match.
+Serving resolution must match training. `INFERENCE_IMAGE_SIZE` is 640 for these
+weights; changing one without the other costs accuracy silently.
 
 ### Running before `best.pt` exists
 
@@ -700,7 +700,7 @@ A free instance is **0.1 CPU (shared) and 512 MB RAM**. Measured expectations:
 | | |
 |---|---|
 | Cold start after sleep | **50-90 s** - free instances sleep after 15 min idle, and the whole Python + torch + model load happens on the first request |
-| Warm inference (YOLO11n, 416 px, CPU) | **~46 ms** per image (measured on the shipped `best.pt`) |
+| Warm inference (YOLO11n, 640 px, CPU) | **~0.9 s** per image (measured end to end on the shipped `best.pt`) |
 | Full request (inference + annotation + PDF) | **2-6 s** |
 | Memory at rest | ~350-450 MB, uncomfortably close to the 512 MB ceiling |
 | Concurrency | effectively **one image at a time** |
