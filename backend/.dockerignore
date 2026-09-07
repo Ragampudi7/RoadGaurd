@@ -1,0 +1,34 @@
+# Everything here is either secret, huge, or useless inside the image.
+# Without this file the whole directory is uploaded as build context on every
+# deploy, which is slow and, in the case of .env, dangerous.
+
+.env
+.env.*
+!.env.example
+!.env.aiven.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Training artefacts and datasets: regenerable, and gigabytes.
+runs/
+datasets/
+*.zip
+
+# Test suites that need a live database or a browser; the container runs
+# neither. tests/ stays - it is small and useful for `docker run ... pytest`.
+db_e2e.py
+official_e2e.py
+pdf_regen_test.py
+
+# Docs and dev tooling.
+README.md
+TRAINING.md
+train_yolo11_colab.ipynb
+test_client.html
+requirements-dev.txt
+*.log
