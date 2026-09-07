@@ -2,6 +2,11 @@
 .env
 .env.*
 !.env.example
+# The Aiven template is a template - it holds variable NAMES and comments, no
+# values. Without this exception `.env.*` swallows it and a fresh clone has no
+# guide for DATABASE_URL, JWT_SECRET or OFFICIAL_EMAILS. `git add` on an
+# ignored path fails silently, so this was invisible until someone cloned.
+!.env.aiven.example
 
 # --- Model weights ---------------------------------------------------------
 # best.pt is usually far too large for Git. Ship it with Git LFS or download
