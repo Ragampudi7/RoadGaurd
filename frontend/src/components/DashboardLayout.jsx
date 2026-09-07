@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Upload, ScanLine, FileText, Map, User,
-  LogOut, Menu, X, ShieldAlert,
+  LogOut, Menu, X, ShieldAlert, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useDetection } from "../context/DetectionContext";
@@ -14,19 +14,22 @@ const LINKS = [
   { to: "/app/upload", label: "Upload", icon: Upload },
   { to: "/app/result", label: "Detection", icon: ScanLine },
   { to: "/app/reports", label: "Reports", icon: FileText },
+  // Only an official account has a queue. Hiding the link is a courtesy, not
+  // a control: the route guards itself and the server refuses the data.
+  { to: "/app/queue", label: "Queue", icon: ShieldCheck, officialOnly: true },
   { to: "/app/map", label: "Map", icon: Map },
   { to: "/app/profile", label: "Profile", icon: User },
 ];
 
 export default function DashboardLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, isOfficial } = useAuth();
   const { isMock } = useDetection();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
 
   const sidebar = (
     <nav className="flex flex-col gap-1 p-3">
-      {LINKS.map(({ to, label, icon: Icon, end }) => (
+      {LINKS.filter((l) => !l.officialOnly || isOfficial).map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to} to={to} end={end} onClick={() => setOpen(false)}
           className={({ isActive }) =>

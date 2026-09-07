@@ -85,6 +85,13 @@ class Report(Base):
     priority_tier: Mapped[str] = mapped_column(String(20), nullable=False)
     response_window: Mapped[str | None] = mapped_column(String(120))
     risk_components: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # The whole RiskAssessment as it stood when the report was filed. The
+    # scalar columns above are what the list and map screens query; this is
+    # what the PDF is rebuilt from. Kept verbatim rather than recomputed
+    # because the weights behind hazard_factor live in app/config.py: editing
+    # one would silently change the numbers on a document already sent to a
+    # municipal body. Older rows have none, and re-derive from `detections`.
+    risk_detail: Mapped[dict | None] = mapped_column(JSONB)
 
     # Full detection list, kept verbatim so a report can be re-rendered without
     # re-running the model.

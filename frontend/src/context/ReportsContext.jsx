@@ -39,18 +39,53 @@ function fromApi(r) {
   };
 }
 
+/**
+ * Headline figures in the shape the server's /reports/stats returns.
+ *
+ * In mock mode there is no server, so the same shape is computed from the
+ * local rows. In real mode it comes from the database, which matters because
+ * the list is paginated: counting the fetched page would quietly under-report
+ * the moment an account passes the page size.
+ */
+function statsFrom(rows) {
+  const bucket = (key) => rows.reduce((acc, r) => {
+    const k = r[key];
+    if (k) acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const worst = rows.reduce((w, r) => (!w || r.risk_index > w.risk_index ? r : w), null);
+  return {
+    total: rows.length,
+    by_condition: bucket("condition"),
+    by_risk_level: bucket("risk_level"),
+    by_status: bucket("status"),
+    average_score: rows.length
+      ? Number((rows.reduce((s, r) => s + (r.score ?? 0), 0) / rows.length).toFixed(2))
+      : null,
+    worst,
+  };
+}
+
 export function ReportsProvider({ children }) {
   const { user, ready: authReady } = useAuth();
   const [reports, setReports] = useState([]);
+  const [stats, setStats] = useState(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
     if (USE_MOCK) return;
-    if (!user) { setReports([]); setReady(true); return; }
+    if (!user) { setReports([]); setStats(null); setReady(true); return; }
     try {
-      const page = await api.list({ limit: 200 });
+      // One round trip each: the page for the list and map, the aggregate for
+      // the dashboard. The aggregate is computed by Postgres over every row,
+      // not over the 200 that happened to come back.
+      const [page, summary] = await Promise.all([
+        api.list({ limit: 200 }),
+        api.stats(),
+      ]);
       setReports(page.items.map(fromApi));
+      setStats({ ...summary, worst: summary.worst ? fromApi(summary.worst) : null });
       setError(null);
     } catch (e) {
       setError(e);
@@ -77,6 +112,18 @@ export function ReportsProvider({ children }) {
     if (!USE_MOCK || !ready) return;
     try { localStorage.setItem(KEY, JSON.stringify(reports)); } catch { /* ignore */ }
   }, [reports, ready]);
+
+  // After any mutation the aggregate is stale. Recomputing it from the local
+  // rows would be wrong for the same reason the dashboard cannot count them:
+  // they are one page. So ask the database again, and never let that failing
+  // undo a mutation that already succeeded.
+  const syncStats = async () => {
+    if (USE_MOCK) return;
+    try {
+      const summary = await api.stats();
+      setStats({ ...summary, worst: summary.worst ? fromApi(summary.worst) : null });
+    } catch { /* the numbers can lag; the report itself did not fail */ }
+  };
 
   /** File -> bare base64 (no data: prefix), which is what the API accepts. */
   const fileToBase64 = (f) =>
@@ -131,6 +178,9 @@ export function ReportsProvider({ children }) {
       priority_tier: analysis.risk.priority_tier,
       response_window: analysis.risk.response_window,
       risk_components: analysis.risk.components ?? [],
+      // The whole risk object, so the PDF can be rebuilt later showing what
+      // was filed rather than what a since-edited config would compute.
+      risk_detail: analysis.risk,
       detections: analysis.detections ?? [],
       model_name: analysis.model_info?.name,
       // The weights fingerprint, not model_info.status ("trained"), which says
@@ -149,6 +199,7 @@ export function ReportsProvider({ children }) {
     });
     const row = fromApi(created);
     setReports((r) => [row, ...r]);
+    syncStats();
     return row;
   };
 
@@ -159,6 +210,7 @@ export function ReportsProvider({ children }) {
     }
     const updated = await api.setStatus(id, status);
     setReports((r) => r.map((x) => (x.id === id ? fromApi(updated) : x)));
+    syncStats();
   };
 
   const submit = (id) => setStatus(id, "Submitted");
@@ -166,6 +218,7 @@ export function ReportsProvider({ children }) {
   const remove = async (id) => {
     if (!USE_MOCK) await api.remove(id);
     setReports((r) => r.filter((x) => x.id !== id));
+    syncStats();
   };
 
   const resetDemo = () => { if (USE_MOCK) setReports(demoReports); };
@@ -173,7 +226,10 @@ export function ReportsProvider({ children }) {
   return (
     <ReportsCtx.Provider
       value={{ reports, ready, error, refresh, saveDraft, submit, setStatus, remove,
-               resetDemo, isMock: USE_MOCK }}>
+               resetDemo, isMock: USE_MOCK,
+               // Mock mode has no server to aggregate for it, so the same
+               // shape is derived locally - the dashboard reads one thing.
+               stats: USE_MOCK ? statsFrom(reports) : stats }}>
       {children}
     </ReportsCtx.Provider>
   );

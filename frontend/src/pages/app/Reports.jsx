@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Send, Trash2, RotateCcw, Database } from "lucide-react";
+import { Send, Trash2, RotateCcw, Database, FileDown, Loader2 } from "lucide-react";
+import { reports as api, downloadBlob } from "../../lib/api";
 import { useReports } from "../../context/ReportsContext";
 import { STATUS_COLOUR, CONDITION_COLOUR, RISK_COLOUR } from "../../lib/mockData";
 
@@ -9,6 +10,7 @@ export default function Reports() {
   const { reports, submit, setStatus, remove, resetDemo, isMock, error, refresh } = useReports();
   const [filter, setFilter] = useState("All");
   const [actErr, setActErr] = useState(null);
+  const [downloading, setDownloading] = useState(null);
   const rows = filter === "All" ? reports : reports.filter((r) => r.status === filter);
 
   // Every mutation can now fail on the server (403 on a transition a citizen
@@ -16,6 +18,21 @@ export default function Reports() {
   async function act(fn) {
     setActErr(null);
     try { await fn(); } catch (e) { setActErr(e); }
+  }
+
+  // The PDF is not stored - the server rebuilds it from the row and the
+  // photograph each time, so this is a request that can fail and can take a
+  // moment, not an instant link.
+  async function download(r) {
+    setActErr(null);
+    setDownloading(r.id);
+    try {
+      downloadBlob(await api.pdf(r.id), `road_health_report_${r.reference ?? r.id}.pdf`);
+    } catch (e) {
+      setActErr(e);
+    } finally {
+      setDownloading(null);
+    }
   }
 
   return (
@@ -108,6 +125,17 @@ export default function Reports() {
                 </div>
 
                 <div className="flex gap-2">
+                  {!isMock && (
+                    <button className="btn btn-ghost !px-3 !py-1.5 !text-xs"
+                            title="Rebuild and download the complaint PDF"
+                            disabled={downloading === r.id}
+                            onClick={() => download(r)}>
+                      {downloading === r.id
+                        ? <Loader2 size={13} className="animate-spin" />
+                        : <FileDown size={13} />}
+                      PDF
+                    </button>
+                  )}
                   {r.status === "Draft" && (
                     <button className="btn btn-primary !px-3 !py-1.5 !text-xs" onClick={() => act(() => submit(r.id))}>
                       <Send size={13} /> Submit

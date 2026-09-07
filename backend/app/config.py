@@ -219,6 +219,18 @@ class Settings(BaseSettings):
     # "union" -> count each overlapping pixel once (see scoring_service).
     area_method: str = "sum"
 
+    # -- Who counts as a municipal official ---------------------------------
+    # Comma-separated. An entry is either a whole address
+    # ("engineer@ghmc.gov.in") or a domain suffix ("@ghmc.gov.in").
+    #
+    # Deliberately NOT a field on the signup form and NOT an invite code: a
+    # self-declared role is no role at all, and a shared code in the UI is a
+    # password that every holder can pass on. Authority here is granted by
+    # whoever configures the deployment, which is the only party that actually
+    # has it. The list is re-checked at every login, so adding an address
+    # promotes that account the next time it signs in.
+    official_emails: str = ""
+
     # -- CORS -------------------------------------------------------------
     frontend_url: str = "http://localhost:3000"
     # Comma-separated list of any additional origins (Vercel previews, etc.)
@@ -292,6 +304,26 @@ class Settings(BaseSettings):
                 origins.append(default)
         # De-duplicate while preserving order.
         return list(dict.fromkeys(origins))
+
+    def role_for(self, email: str) -> str:
+        """
+        The role an address is entitled to.
+
+        Matching is case-insensitive, and an entry beginning with "@" matches
+        any address in that domain - a municipal body signs its staff up by the
+        dozen and listing each one by hand would not survive contact with that.
+        """
+        address = email.strip().lower()
+        for entry in self.official_emails.split(","):
+            entry = entry.strip().lower()
+            if not entry:
+                continue
+            if entry.startswith("@"):
+                if address.endswith(entry):
+                    return "official"
+            elif address == entry:
+                return "official"
+        return "citizen"
 
     @property
     def is_production(self) -> bool:

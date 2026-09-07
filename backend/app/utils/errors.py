@@ -182,3 +182,18 @@ class DatabaseUnavailableError(AppError):
         "Persistence is not configured on this server. Analysis still works, "
         "but reports cannot be saved."
     )
+
+
+class ReportNotRenderableError(AppError):
+    """
+    The report exists but cannot be turned back into a document.
+
+    Distinct from ReportGenerationError (500): nothing is broken here. The row
+    is simply missing something the PDF needs - almost always the photograph,
+    on a report filed before the evidence was stored. A 500 would page whoever
+    is watching for a fault that is not theirs to fix.
+    """
+
+    status_code = 409
+    error_code = "report_not_renderable"
+    message = "This report cannot be rebuilt into a document."

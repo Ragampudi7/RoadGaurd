@@ -488,6 +488,29 @@ def _masthead(ctx: Dict[str, Any], style: Dict[str, ParagraphStyle], width: floa
             ("RIGHTPADDING", (0, 0), (-1, -1), 10),
         ]))
         flow += [warn, Spacer(1, 4 * mm)]
+
+    # A rebuilt copy says so. Same figures, different day: without this line a
+    # regenerated document is indistinguishable from the one that was filed,
+    # and its date would read as the date of the inspection.
+    if ctx.get("regenerated_at"):
+        filed = ctx["generated_at"].strftime("%d %b %Y")
+        rebuilt = ctx["regenerated_at"].strftime("%d %b %Y, %I:%M %p")
+        lines = [
+            "REGENERATED COPY. Rebuilt on %s from the assessment filed on %s. "
+            "Every figure is the one that was filed; the model was not re-run."
+            % (escape(rebuilt), escape(filed))
+        ]
+        lines += [escape(str(w)) for w in ctx.get("extra_warnings") or []]
+        note = Table([[Paragraph(" ".join(lines), style["cap"])]], colWidths=[width])
+        note.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#EEF2F7")),
+            ("ROUNDEDCORNERS", RADIUS),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        flow += [note, Spacer(1, 3.5 * mm)]
     return flow
 
 
@@ -739,6 +762,13 @@ def build_report(ctx: Dict[str, Any]) -> bytes:
                                                       ctx["source_size"][0],
                                                       ctx["source_size"][1])),
                 ("Evidence SHA-256", Paragraph(escape(ctx["sha256"][:24]) + "...", style["mono"])),
+                # Which weights produced these numbers. A reader comparing two
+                # reports of the same road needs to know whether they came from
+                # the same model before treating the difference as the road
+                # changing rather than the detector changing.
+                ("Detector", Paragraph(escape("%s (%s)" % (
+                    ctx.get("model_name", "unknown"),
+                    ctx.get("model_version", "unknown"))), style["mono"])),
                 ("Map link", Paragraph(
                     '<link href="%s" color="#1D4ED8">Open this location in Google Maps</link>'
                     % escape(ctx["maps_url"]), style["cap"])),
@@ -754,7 +784,10 @@ def build_report(ctx: Dict[str, Any]) -> bytes:
                 ("Dominant defect", (risk.dominant_defect or "None").replace("_", " ").title()),
                 ("Priority action", ctx["detections"][0].recommended_action
                  if ctx["detections"] else "No action requested"),
-                ("Submission status", "Prepared by the citizen - not yet filed with the authority"),
+                # A regenerated report knows where it actually got to; a freshly
+                # analysed one has not been filed yet by definition.
+                ("Submission status", ctx.get("submission_status")
+                 or "Prepared by the citizen - not yet filed with the authority"),
             ], style, half - 18),
         ], half, padding=9)
 

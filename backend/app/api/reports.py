@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +42,15 @@ StatusLiteral = Literal["Draft", "Submitted", "Acknowledged", "Resolved"]
 #   official: may acknowledge and resolve anything
 CITIZEN_TRANSITIONS = {"Draft": {"Submitted"}, "Submitted": {"Draft"}}
 
+# An official acts on filed complaints. They may acknowledge, resolve, and
+# reopen a resolution that did not hold - but they may not push a report back
+# to Draft, which would un-file a complaint the citizen did send.
+OFFICIAL_TRANSITIONS = {
+    "Submitted": {"Acknowledged", "Resolved"},
+    "Acknowledged": {"Resolved", "Submitted"},
+    "Resolved": {"Acknowledged"},
+}
+
 
 # ----------------------------------------------------------------- schemas --
 class ReportCreate(BaseModel):
@@ -60,6 +70,9 @@ class ReportCreate(BaseModel):
     priority_tier: str = Field(max_length=20)
     response_window: str | None = Field(default=None, max_length=120)
     risk_components: list[dict[str, Any]] = Field(default_factory=list)
+    # The whole risk object, so a regenerated PDF shows what was filed rather
+    # than what today's config would compute.
+    risk_detail: dict[str, Any] | None = None
 
     detections: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -203,11 +216,16 @@ async def _owned(report_id: uuid.UUID, user: User, session: AsyncSession) -> Rep
     report = await session.get(Report, report_id)
     if report is None:
         raise NotFoundError("No report with that id.")
-    # Officials may read any report; citizens only their own. Returning 404
-    # rather than 403 avoids confirming that someone else's id exists.
-    if report.user_id != user.id and user.role != "official":
-        raise NotFoundError("No report with that id.")
-    return report
+    if report.user_id == user.id:
+        return report
+    # An official may read any report a citizen has actually FILED. A draft is
+    # a private working copy - it has not been sent to anybody, and the role
+    # that acts on complaints is not a role that reads unsent ones.
+    #
+    # Both refusals are 404 rather than 403: a 403 would confirm the id exists.
+    if user.role == "official" and report.status != "Draft":
+        return report
+    raise NotFoundError("No report with that id.")
 
 
 # ------------------------------------------------------------------- routes --
@@ -254,6 +272,10 @@ async def list_reports(
     where = []
     if mine or user.role != "official":
         where.append(Report.user_id == user.id)
+    else:
+        # The official's queue. Drafts are excluded for the same reason
+        # _owned() excludes them: nobody has filed them yet.
+        where.append(Report.status != "Draft")
     if status_filter:
         where.append(Report.status == status_filter)
     if None not in (min_lat, max_lat):
@@ -274,7 +296,8 @@ async def stats(
     session: AsyncSession = Depends(get_session),
     mine: bool = Query(default=True),
 ):
-    where = [Report.user_id == user.id] if (mine or user.role != "official") else []
+    where = ([Report.user_id == user.id] if (mine or user.role != "official")
+             else [Report.status != "Draft"])   # see list_reports: drafts are unfiled
 
     async def bucket(col):
         rows = await session.execute(
@@ -323,6 +346,38 @@ async def get_report_image(
     return Response(content=r.image_bytes, media_type=r.image_mime or "image/jpeg")
 
 
+@router.get("/reports/{report_id}/pdf")
+async def get_report_pdf(
+    report_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Rebuild the complaint document for a filed report.
+
+    Nothing is re-run: the PDF is replayed from the stored numbers and the
+    stored photograph, and is marked as a regenerated copy. This is the half
+    of the storage policy that makes throwing the PDF away safe - without it,
+    the document only ever exists in the tab where the analysis happened.
+    """
+    from app.services import report_render
+
+    r = await _owned(report_id, user, session)
+    pdf = await run_in_threadpool(report_render.build_pdf, r, settings)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="road_health_report_{r.reference}.pdf"',
+            # The document is rebuilt on each request and a stale copy would
+            # show a stale status; let the browser ask every time.
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @router.patch("/reports/{report_id}/status", response_model=ReportOut)
 async def set_status(
     report_id: uuid.UUID,
@@ -332,7 +387,14 @@ async def set_status(
 ):
     r = await _owned(report_id, user, session)
 
-    if user.role != "official":
+    if user.role == "official":
+        if body.status not in OFFICIAL_TRANSITIONS.get(r.status, set()):
+            raise ForbiddenError(
+                f"An official cannot move a report from {r.status} to {body.status}. "
+                "Withdrawing a complaint is the citizen's decision, not the "
+                "authority's."
+            )
+    else:
         allowed = CITIZEN_TRANSITIONS.get(r.status, set())
         if body.status not in allowed:
             # This is the hole the localStorage prototype had: anyone could mark

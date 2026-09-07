@@ -92,7 +92,13 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthCtx.Provider value={{ user, ready, error, login, signup, logout, updateProfile, isMock: USE_MOCK }}>
+    <AuthCtx.Provider value={{
+      user, ready, error, login, signup, logout, updateProfile, isMock: USE_MOCK,
+      // The role decides which screens exist. It is only ever the one the
+      // server put in the profile — there is no way to set it from here, and
+      // the server re-checks on every request regardless of what this says.
+      isOfficial: user?.role === "official",
+    }}>
       {children}
     </AuthCtx.Provider>
   );

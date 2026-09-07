@@ -62,7 +62,8 @@ def api(path, token=None):
 
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=CH)
-    ctx = browser.new_context(viewport={"width": 1320, "height": 950})
+    ctx = browser.new_context(viewport={"width": 1320, "height": 950},
+                              accept_downloads=True)
     pg = ctx.new_page()
 
     console_errors, api_calls = [], []
@@ -112,6 +113,10 @@ with sync_playwright() as p:
           any(u.endswith("/auth/me") for _, u in api_calls))
     check("dashboard empty-state, not demo rows",
           pg.locator("text=Demo data").count() == 0)
+    check("dashboard asked the database for its totals",
+          any(u.rstrip("/").endswith("/reports/stats") for _, u in api_calls))
+    check("does not claim reports live in this browser",
+          "in this browser" not in pg.content())
     pg.screenshot(path="r1_dashboard_empty.png", full_page=True)
 
     # -- 4. analyse runs the trained model -----------------------------------
@@ -182,8 +187,40 @@ with sync_playwright() as p:
     check("Withdraw is offered instead", pg.locator("button:has-text('Withdraw')").count() == 1)
     pg.screenshot(path="r3_reports.png", full_page=True)
 
+    # -- 6b. the complaint document can be got back --------------------------
+    print("\n6b. Rebuild the PDF")
+    check("a PDF button is offered on the card",
+          pg.get_by_role("button", name="PDF").count() == 1)
+    with pg.expect_download(timeout=60000) as dl:
+        pg.get_by_role("button", name="PDF").click()
+    download = dl.value
+    path = download.path()
+    head = open(path, "rb").read(5)
+    check("clicking it downloads a real PDF", head == b"%PDF-", str(head))
+    check("named by the reference, not the UUID",
+          download.suggested_filename.startswith("road_health_report_RHA-"),
+          download.suggested_filename)
+    import os as _os
+    check("has real content", _os.path.getsize(path) > 40_000,
+          f"{_os.path.getsize(path)} bytes")
+
+    # -- 6c. the dashboard counts what the database holds ---------------------
+    print("\n6c. Dashboard totals")
+    pg.goto(APP + "/app", wait_until="networkidle")
+    pg.wait_for_timeout(2500)
+    db_total = db("select count(*) from reports r join users u on u.id = r.user_id "
+                  f"where u.email = '{EMAIL}'")
+    tiles = pg.locator("main .glass").first
+    check("headline count matches the database",
+          f">{db_total}<" in pg.content() or db_total in tiles.inner_text(),
+          f"database says {db_total}")
+    check("the filed report shows as an open grievance",
+          "Open grievances" in pg.content())
+
     # -- 7. withdraw round-trips through the server --------------------------
     print("\n7. Withdraw")
+    pg.goto(APP + "/app/reports", wait_until="networkidle")
+    pg.wait_for_timeout(2000)
     api_calls.clear()
     pg.click("button:has-text('Withdraw')")
     pg.wait_for_timeout(1800)

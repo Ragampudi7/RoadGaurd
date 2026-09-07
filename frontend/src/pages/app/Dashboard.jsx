@@ -40,16 +40,28 @@ function TooltipCard({ active, payload, label, suffix = "" }) {
 }
 
 export default function Dashboard() {
-  const { reports } = useReports();
+  const { reports, stats, isMock } = useReports();
   const { user } = useAuth();
-  const { byCondition, timeline } = distributions(reports);
+  // The timeline needs per-report dates, which no aggregate carries, so it is
+  // drawn from the rows that were loaded. Every headline number comes from the
+  // aggregate: the row list is one page, and counting a page would understate
+  // the totals the moment an account has more reports than fit in it.
+  const { timeline } = distributions(reports);
 
-  const total = reports.length;
-  const open = reports.filter((r) => r.status === "Submitted" || r.status === "Acknowledged").length;
-  const resolved = reports.filter((r) => r.status === "Resolved").length;
-  const avgScore = total ? (reports.reduce((s, r) => s + r.score, 0) / total).toFixed(1) : "—";
-  const worst = reports.reduce((w, r) => (!w || r.risk_index > w.risk_index ? r : w), null);
-  const anyDemo = reports.some((r) => r.is_demo !== false);
+  const s = stats ?? { total: 0, by_condition: {}, by_status: {}, average_score: null, worst: null };
+  const total = s.total;
+  const open = (s.by_status?.Submitted ?? 0) + (s.by_status?.Acknowledged ?? 0);
+  const resolved = s.by_status?.Resolved ?? 0;
+  const avgScore = s.average_score == null ? "—" : s.average_score.toFixed(1);
+  const worst = s.worst;
+  // All four bands are drawn even at zero: an empty "Dangerous" row is a
+  // finding, and a chart that silently omits it reads as a shorter scale.
+  const byCondition = ["Good", "Fair", "Poor", "Dangerous"].map((name) => ({
+    name,
+    value: s.by_condition?.[name] ?? 0,
+    fill: CONDITION_COLOUR[name],
+  }));
+  const anyDemo = isMock;
 
   const TILES = [
     { icon: FileText, v: total, l: "Reports filed" },
@@ -66,7 +78,9 @@ export default function Dashboard() {
             Welcome back, <span className="capitalize">{user?.name}</span>
           </h1>
           <p className="text-sm text-[color:var(--color-muted)]">
-            {total ? `${total} reports in this browser.` : "No reports yet."}
+            {total === 0
+              ? "No reports yet."
+              : `${total} report${total === 1 ? "" : "s"} ${isMock ? "in this browser" : "on your account"}.`}
           </p>
         </div>
         {anyDemo && <DemoBadge />}

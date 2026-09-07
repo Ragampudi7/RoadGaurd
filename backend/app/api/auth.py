@@ -23,7 +23,10 @@ from app.utils.errors import (
     AccountDisabledError, EmailTakenError, InvalidCredentialsError,
     InvalidTokenError, UnauthenticatedError,
 )
+from app.utils.logging_config import get_logger
 from app.utils.security import create_token, decode_token, hash_password, verify_password
+
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -106,6 +109,10 @@ async def signup(
         name=body.name.strip(),
         password_hash=hash_password(body.password),
         city=(body.city or None),
+        # The role comes from the deployment's allow-list, never from the
+        # request. There is no field on the signup form for it, so nobody can
+        # ask to be a municipal official.
+        role=settings.role_for(email),
     )
     session.add(user)
     await session.flush()
@@ -131,6 +138,17 @@ async def login(
         raise InvalidCredentialsError()
     if not user.is_active:
         raise AccountDisabledError()
+
+    # Re-check the allow-list on every login: adding an address to it should
+    # promote that account without anyone touching the database, and removing
+    # one should demote it just as quietly.
+    entitled = settings.role_for(user.email)
+    if user.role != entitled:
+        logger.info("Role for %s changes %s -> %s (allow-list)",
+                    user.email, user.role, entitled)
+        user.role = entitled
+        session.add(user)
+        await session.flush()
 
     token = create_token(subject=str(user.id), secret=settings.jwt_secret,
                          expires_hours=settings.jwt_expires_hours, role=user.role)
