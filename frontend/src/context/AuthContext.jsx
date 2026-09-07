@@ -1,66 +1,98 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { auth as authApi, getToken, setToken, USE_MOCK } from "../lib/api";
 
 /**
- * MOCK AUTH — deliberately not security.
+ * Authentication.
  *
- * This gates navigation, not data: the "session" is a localStorage key anyone
- * can set from devtools, and there is no server verifying anything. It exists
- * so the app shell, ProtectedRoute and profile screens can be built now. Real
- * accounts arrive with the database, which is where users can actually live.
+ * Two modes, and the difference is not cosmetic:
+ *
+ *   USE_MOCK=true   a localStorage profile. No password is checked and nothing
+ *                   reaches a server; it gates navigation, not data. The UI
+ *                   says so on the auth and profile screens.
+ *   USE_MOCK=false  real accounts. bcrypt-hashed passwords, a signed token, and
+ *                   reports owned by the account that filed them.
  */
-const KEY = "roadguard_user";
+const MOCK_KEY = "roadguard_user";
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setUser(JSON.parse(raw));
-    } catch {
-      /* private mode, cleared storage, corrupt JSON — start signed out */
-    }
-    setReady(true);
+    let alive = true;
+    (async () => {
+      if (USE_MOCK) {
+        try {
+          const raw = localStorage.getItem(MOCK_KEY);
+          if (raw && alive) setUser(JSON.parse(raw));
+        } catch { /* private mode or corrupt JSON — start signed out */ }
+      } else if (getToken()) {
+        // Resume the session by asking the server who this token belongs to,
+        // rather than trusting a cached profile the token may no longer match.
+        try {
+          const me = await authApi.me();
+          if (alive) setUser(me);
+        } catch {
+          setToken(null);       // expired or revoked
+        }
+      }
+      if (alive) setReady(true);
+    })();
+    return () => { alive = false; };
   }, []);
 
-  function persist(u) {
+  function persistMock(u) {
     setUser(u);
     try {
-      if (u) localStorage.setItem(KEY, JSON.stringify(u));
-      else localStorage.removeItem(KEY);
-    } catch { /* storage unavailable; session is in-memory only */ }
+      if (u) localStorage.setItem(MOCK_KEY, JSON.stringify(u));
+      else localStorage.removeItem(MOCK_KEY);
+    } catch { /* storage unavailable; session stays in memory */ }
   }
 
-  const login = async ({ email }) => {
-    const u = {
-      id: "u_" + btoa(email).slice(0, 10).replace(/=/g, ""),
-      name: email.split("@")[0].replace(/[._-]/g, " "),
-      email,
-      city: "Hyderabad",
-      joined: new Date().toISOString(),
-      mock: true,
-    };
-    persist(u);
-    return u;
-  };
+  async function login({ email, password }) {
+    setError(null);
+    if (USE_MOCK) {
+      const u = { id: "u_local", name: email.split("@")[0].replace(/[._-]/g, " "),
+                  email, city: "Hyderabad", joined: new Date().toISOString(), mock: true };
+      persistMock(u);
+      return u;
+    }
+    const res = await authApi.login({ email, password });
+    setToken(res.access_token);
+    setUser(res.user);
+    return res.user;
+  }
 
-  const signup = async ({ name, email }) => {
-    const u = {
-      id: "u_" + btoa(email).slice(0, 10).replace(/=/g, ""),
-      name, email, city: "Hyderabad",
-      joined: new Date().toISOString(), mock: true,
-    };
-    persist(u);
-    return u;
-  };
+  async function signup({ name, email, password, city }) {
+    setError(null);
+    if (USE_MOCK) {
+      const u = { id: "u_local", name, email, city: city || "Hyderabad",
+                  joined: new Date().toISOString(), mock: true };
+      persistMock(u);
+      return u;
+    }
+    const res = await authApi.signup({ name, email, password, city });
+    setToken(res.access_token);
+    setUser(res.user);
+    return res.user;
+  }
 
-  const updateProfile = (patch) => persist({ ...user, ...patch });
-  const logout = () => persist(null);
+  async function updateProfile(patch) {
+    if (USE_MOCK) return persistMock({ ...user, ...patch });
+    const me = await authApi.updateMe(patch);
+    setUser(me);
+    return me;
+  }
+
+  function logout() {
+    if (USE_MOCK) persistMock(null);
+    else { setToken(null); setUser(null); }
+  }
 
   return (
-    <AuthCtx.Provider value={{ user, ready, login, signup, logout, updateProfile }}>
+    <AuthCtx.Provider value={{ user, ready, error, login, signup, logout, updateProfile, isMock: USE_MOCK }}>
       {children}
     </AuthCtx.Provider>
   );

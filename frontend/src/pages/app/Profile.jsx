@@ -4,16 +4,22 @@ import { useReports } from "../../context/ReportsContext";
 import { ShieldAlert, Save } from "lucide-react";
 
 export default function Profile() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, isMock } = useAuth();
   const { reports } = useReports();
   const [form, setForm] = useState({ name: user?.name ?? "", city: user?.city ?? "" });
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState(null);
 
-  function onSubmit(e) {
+  async function onSubmit(e) {
     e.preventDefault();
-    updateProfile(form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2200);
+    setErr(null);
+    try {
+      await updateProfile(form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2200);
+    } catch (ex) {
+      setErr(ex);
+    }
   }
 
   return (
@@ -34,6 +40,11 @@ export default function Profile() {
       </div>
 
       <form onSubmit={onSubmit} className="glass grid gap-4 p-5">
+        {err && (
+          <div className="glass-soft border-[color:var(--color-danger)]/40 p-3 text-[13px] text-[color:var(--color-danger)]" role="alert">
+            {err.message}
+          </div>
+        )}
         <div>
           <label className="label" htmlFor="pname">Display name</label>
           <input id="pname" className="field" value={form.name}
@@ -50,13 +61,21 @@ export default function Profile() {
       </form>
 
       <div className="glass-soft flex items-start gap-2.5 p-4 text-[13px] text-[color:var(--color-muted)]">
-        <ShieldAlert size={15} className="mt-0.5 shrink-0 text-[color:var(--color-fair)]" />
-        <p>
-          This account is a local demo. Nothing was sent to a server, no password
-          was checked, and the profile is a{" "}
-          <span className="font-mono">localStorage</span> key any visitor to this
-          browser can read or edit. It gates navigation, not data.
-        </p>
+        <ShieldAlert size={15} className={`mt-0.5 shrink-0 ${isMock ? "text-[color:var(--color-fair)]" : "text-[color:var(--color-good)]"}`} />
+        {isMock ? (
+          <p>
+            This account is a local demo. Nothing was sent to a server, no password
+            was checked, and the profile is a{" "}
+            <span className="font-mono">localStorage</span> key any visitor to this
+            browser can read or edit. It gates navigation, not data.
+          </p>
+        ) : (
+          <p>
+            A real account. Your password is bcrypt-hashed on the server and is
+            never stored or logged in plain text. Reports are owned by this
+            account and follow it to any device you sign in on.
+          </p>
+        )}
       </div>
     </div>
   );
