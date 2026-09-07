@@ -118,9 +118,17 @@ and both hid real bugs.
 
 ## Deploying
 
-`render.yaml` at the repository root brings up both services. See
-[section 10 of the backend README](backend/README.md) for the full walkthrough
-and the four values Render will prompt for.
+Each service has its own `Dockerfile`, so the build is identical wherever it
+runs and nothing depends on a platform guessing the language right.
+
+**[`DEPLOY.md`](DEPLOY.md)** is the walkthrough — Railway, two services from
+this one repository, in the order that avoids a redeploy. It also explains the
+one trap worth knowing: `VITE_API_BASE` is compiled into the frontend bundle
+at *build* time, so it has to reach the Docker build as an `ARG`, not arrive
+later as a runtime variable.
+
+A `render.yaml` blueprint is also in the repository root and is correct, if
+you would rather use Render.
 
 ---
 

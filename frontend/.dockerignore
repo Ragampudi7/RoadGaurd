@@ -1,0 +1,20 @@
+# node_modules is the big one: shipping it as build context is slow, and
+# `npm ci` rebuilds it inside the image anyway from the lockfile.
+
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# Browser test suites and their screenshots - they drive a running stack from
+# outside and have no business in the image.
+e2e_real.py
+e2e_official.py
+spa_server.py
+# Root-level only, deliberately: `*.png` would also swallow a future image in
+# public/, and the build would succeed with a missing asset and no warning.
+/*.png
+
+README.md
+.oxlintrc.json
