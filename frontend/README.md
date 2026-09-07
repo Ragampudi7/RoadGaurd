@@ -33,26 +33,55 @@ VITE_API_BASE=http://localhost:8000
 `mockDetectionResult` is shaped field-for-field like the backend's
 `AnalyzeResponse`, so nothing else changes — the swap is one flag.
 
-## Auth is not auth
+Both are read by Vite at **build** time, not at runtime. Changing either on a
+deployed site needs a rebuild, not a restart.
 
-`AuthContext` is a localStorage key. No password is checked, nothing reaches a
-server, and anyone can forge a session from devtools. It gates navigation so the
-app shell can be built; it protects nothing. Real accounts need the database.
+## Two modes, and the difference is not cosmetic
 
-Same for reports: `ReportsContext` persists to `localStorage`, so reports filed
-on a phone will not appear on a laptop and clearing site data loses them.
+`VITE_USE_MOCK` picks which one runs, and every screen's copy follows it. Get
+this wrong and the app tells the user something untrue about their own data,
+which is why the contexts branch on it rather than the screens.
+
+**Mock (`true`).** `AuthContext` is a localStorage key: no password is checked,
+nothing reaches a server, and anyone can forge a session from devtools. It gates
+navigation so the shell can be built; it protects nothing. `ReportsContext`
+persists to `localStorage`, so reports filed on a phone never appear on a laptop
+and clearing site data loses them. The auth and profile screens say so.
+
+**Real (`false`).** Real accounts - bcrypt-hashed passwords, a signed token, and
+reports owned by the account that filed them and reachable from any device.
+A refresh resumes the session by calling `/auth/me` rather than trusting a
+cached profile the token may no longer match. The "stays in this browser"
+notices come out, because they are no longer true.
+
+Screens do not branch on the mode; the contexts normalise the server's rows into
+the same flat shape the mock data already used. Only the copy differs.
+
+## Roles
+
+An account is a citizen or an official, decided by the **server** from its
+`OFFICIAL_EMAILS` allow-list. The client only ever reads `user.role` out of the
+profile the server sent.
+
+An official gets `/app/queue`: filed complaints, worst first, with Acknowledge,
+Mark resolved and Reopen. A citizen navigating there is redirected. That guard
+is navigation, not security - the server re-checks the role on every request, so
+bypassing it gets an empty screen and a 403, never data.
+
+Drafts never reach the queue. An unsent working copy is not a complaint.
 
 ## Structure
 
 ```
 src/
-├── context/     Auth · Detection · Reports  (all localStorage-backed)
+├── context/     Auth · Detection · Reports  (server-backed, or localStorage in mock mode)
 ├── lib/         api.js (real client) · mockData.js · reportPdf.js
 ├── components/  ProtectedRoute · DashboardLayout · Navbar · AuthLayout
 │                Results (gauge, risk panel, table) · Reveal · DemoBadge
 │                landing/  Hero · Features · HowItWorks · Stats · CTA · Footer
 └── pages/       Landing · Login · Signup
     └── app/     Dashboard · Upload · DetectionResult · Reports · MapView · Profile
+                  Queue  (officials only)
 ```
 
 `Dashboard` and `MapView` are lazy-loaded — Recharts and Leaflet are the two
@@ -83,3 +112,15 @@ resolution (640 px — do not upscale, they go soft). Sources are the
 [Pothole](https://universe.roboflow.com/siva-ragampudi/pothole-vhmow-jwwzq) and
 [Road](https://universe.roboflow.com/siva-ragampudi/road-c013o-tlkm7) datasets on
 Roboflow Universe, CC BY 4.0 — attribution is in the site footer.
+
+## Getting a filed report back
+
+The complaint PDF is not stored. `GET /reports/{id}/pdf` rebuilds it from the
+row and the photograph, so the **PDF** button on a report card is a request that
+can fail and can take a moment — not an instant link. It cannot be a plain
+`<a href>` either: the endpoint needs the `Authorization` header and a browser
+sends none on a navigation, so `api.pdf()` fetches the blob and hands it to a
+temporary object URL.
+
+The rebuilt document is stamped as a regenerated copy, with the date and the
+weights version the figures were filed under.

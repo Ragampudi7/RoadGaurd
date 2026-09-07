@@ -362,7 +362,128 @@ curl -X POST "http://localhost:8000/analyze?include_pdf=false&include_image=fals
 
 ---
 
-## 4. Frontend integration
+## 4. Accounts, reports and the grievance loop
+
+Everything in section 3 works with no database at all: `POST /analyze` takes a
+photograph and hands back a scored assessment and a PDF. That is the whole
+product for one visit. What it cannot do is remember - close the tab and the
+complaint is gone.
+
+Set `DATABASE_URL` and the rest of this section switches on. Leave it unset and
+the API behaves exactly as before, endpoints and all; nothing here is required
+to demonstrate detection.
+
+### Accounts
+
+| | |
+|---|---|
+| `POST /auth/signup` | `{name, email, password, city?}` -> a token and the profile |
+| `POST /auth/login` | `{email, password}` -> the same |
+| `GET /auth/me` | the profile behind the bearer token |
+| `PATCH /auth/me` | change name or city |
+
+Passwords are bcrypt-hashed. A password over 72 bytes is **rejected** rather
+than silently truncated, which is what bcrypt does on its own and what turns a
+long passphrase into its first 72 bytes without telling anybody.
+
+Login answers **the same message** for an unknown email and a wrong password.
+Distinguishing them turns the login form into an account-enumeration oracle:
+type an address, read the error, learn whether that person has an account.
+There is a test asserting the two strings are identical, because this is the
+kind of thing that gets "improved" into a friendlier message.
+
+Tokens are HS256 JWTs. `JWT_SECRET` must be at least 32 bytes (RFC 7518 §3.2)
+and the app **refuses to start in production** with the development default -
+a signing key that ships in a repository signs anybody's tokens.
+
+### Reports
+
+| | |
+|---|---|
+| `POST /reports` | file an assessment; `submit: true` files it, otherwise it is a draft |
+| `GET /reports` | your reports, filterable by status and by map bounding box |
+| `GET /reports/stats` | totals by condition, risk, status; average score; worst |
+| `GET /reports/{id}` | one report, with its full detection list |
+| `GET /reports/{id}/image` | the original photograph |
+| `GET /reports/{id}/pdf` | **the complaint document, rebuilt** |
+| `PATCH /reports/{id}/status` | move it through the workflow |
+| `DELETE /reports/{id}` | only your own |
+
+**What is stored, and what is not.** Metadata, the full detection list, and the
+original photograph. The annotated image, the close-up crops and the PDF are
+all thrown away and rebuilt on demand. That is roughly 102 KB per report
+instead of 415 KB - about 10,000 reports on a 1 GB free tier instead of 2,400.
+
+That bargain only holds because `GET /reports/{id}/pdf` exists. It replays the
+stored numbers; it never re-runs the model. The rebuilt document is stamped
+**REGENERATED COPY** with the date and the weights fingerprint the figures were
+produced under, and if the scoring configuration has changed since it was filed,
+it says so on the page instead of quietly showing the new number. This is why
+`model_name` and `model_version` are columns: a report rendered under different
+weights is a different document, and the version is how anyone notices.
+
+### The workflow, and who may move it
+
+```
+Draft  ──file──▶  Submitted  ──acknowledge──▶  Acknowledged  ──resolve──▶  Resolved
+  ▲                    │                             │                        │
+  └────withdraw────────┘                             └──────reopen────────────┘
+       (citizen)                                              (official)
+```
+
+A citizen files and withdraws their own reports. An official acknowledges,
+resolves, and reopens a resolution that did not hold. **Neither reaches into
+the other's half**: a citizen who could mark their own complaint Resolved makes
+the status meaningless, and an official who could push one back to Draft would
+be un-filing a complaint the citizen did send. Both refusals are 403 from the
+server, not a hidden button - the UI hides them too, but the UI is not the
+guard.
+
+### Who is an official
+
+`OFFICIAL_EMAILS`, a comma-separated list of whole addresses
+(`engineer@ghmc.gov.in`) or domain suffixes (`@ghmc.gov.in`). Checked at signup
+and re-checked at every login, so adding an address promotes that account the
+next time it signs in and removing one demotes it, without touching the
+database.
+
+Two things it is deliberately **not**:
+
+* **Not a field on the signup form.** A self-declared role is no role. Send
+  `{"role": "official"}` to `/auth/signup` and you get a citizen account; there
+  is a test for it.
+* **Not an invite code.** A shared secret in the UI is a password that every
+  holder can pass to anybody else, and nobody can revoke it without changing it
+  for everyone.
+
+The grant belongs to whoever configures the deployment, because that is the
+only party that actually holds the authority.
+
+An official sees `GET /reports?mine=false` - every **filed** complaint, worst
+first. Drafts never appear: an unsent working copy is not a complaint. Reading
+one by id returns **404 rather than 403**, so the response does not confirm the
+id exists either. The queue carries no reporter contact details; the complaint
+is about a road, and handing every official the citizen's email would be
+collecting personal data the job does not need.
+
+### Schema changes
+
+`Base.metadata.create_all` only ever **creates** tables. On a database whose
+tables already exist it does nothing at all, silently - including when a model
+has grown a column since. That fails in exactly the worst way: a fresh local
+database gets the new column from the create, the deployed one does not, and
+the first insert dies with `UndefinedColumnError` in production.
+
+So start-up reconciles. Any column the models declare, the table lacks, and
+which is nullable or has a default is added with `ALTER TABLE`. Anything else -
+a dropped column, a changed type, a new `NOT NULL` over existing rows - is
+logged loudly and left alone, because those need a migration that decides what
+happens to the data already there. This is not a substitute for Alembic on a
+system with real users; it is what keeps a small deployment honest.
+
+---
+
+## 5. Frontend integration
 
 ```js
 // 1. live GPS from the browser
@@ -411,7 +532,7 @@ exactly the above - open it in a browser to test the whole flow.
 
 ---
 
-## 5. How the numbers are calculated
+## 6. How the numbers are calculated
 
 For every detection the model gives a class, a confidence and a box:
 
@@ -548,7 +669,7 @@ as "deep" or otherwise depth-measured.
 
 ---
 
-## 6. Configuration
+## 7. Configuration
 
 Everything is an environment variable; nothing is hardcoded. Copy `.env.example`
 to `.env` for local development. On Render, set these in the dashboard or in
@@ -580,6 +701,10 @@ to `.env` for local development. On Render, set these in the dashboard or in
 | `INCLUDE_DEFECT_CROPS` | `true` | render per-defect close-ups in the report and response |
 | `MAX_DEFECT_CROPS` | `6` | cap on how many close-ups are produced |
 | `CROP_THUMBNAIL_SIDE` | `360` | longest side of each close-up, in pixels |
+| `DATABASE_URL` | *(unset)* | Postgres. Unset means no accounts, no stored reports - `/analyze` is unaffected |
+| `JWT_SECRET` | dev default | signs session tokens; production start-up **refuses** the default or anything under 32 bytes |
+| `JWT_EXPIRES_HOURS` | `72` | session lifetime |
+| `OFFICIAL_EMAILS` | *(empty)* | who may acknowledge and resolve: whole addresses or `@domain` suffixes, comma-separated (section 4) |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS origin for your frontend |
 | `EXTRA_CORS_ORIGINS` | *(empty)* | comma-separated extra origins |
 | `MUNICIPAL_AUTHORITY` | GHMC | who the complaint is addressed to |
@@ -590,7 +715,7 @@ to `.env` for local development. On Render, set these in the dashboard or in
 
 ---
 
-## 7. Project structure
+## 8. Project structure
 
 ```
 backend/
@@ -598,28 +723,38 @@ backend/
 │   ├── main.py                     FastAPI app, CORS, error handlers, startup model load
 │   ├── config.py                   ALL settings + the classification bands
 │   ├── api/
-│   │   └── routes.py               GET /, GET /health, POST /analyze
+│   │   ├── routes.py               GET /, GET /health, POST /analyze
+│   │   ├── auth.py                 signup, login, profile; the bearer-token dependency
+│   │   └── reports.py              filing, listing, stats, status, evidence, rebuilt PDF
 │   ├── services/
 │   │   ├── assessment_service.py   the pipeline, start to finish
 │   │   ├── detection_service.py    YOLO singleton, CPU inference, fallback logic
 │   │   ├── scoring_service.py      area, percentage, score, classification, complaint text
 │   │   ├── risk_service.py         severity bands, hazard weights, Road Risk Index
 │   │   ├── image_service.py        annotation, close-up crops, JPEG encoding (all in BytesIO)
-│   │   └── pdf_service.py          ReportLab report: gauge, risk meter, inventory, evidence
+│   │   ├── pdf_service.py          ReportLab report: gauge, risk meter, inventory, evidence
+│   │   └── report_render.py        rebuilds a filed report's PDF from the stored row
 │   ├── models/
 │   │   └── schemas.py              every request/response shape
+│   ├── db/
+│   │   ├── base.py                 engine, session, URL normalisation, schema reconcile
+│   │   └── models.py               User and Report, and what is deliberately not stored
 │   └── utils/
 │       ├── validation.py           image + GPS validation
+│       ├── security.py             bcrypt hashing, JWT sign and verify
 │       ├── errors.py               typed errors -> HTTP status codes
 │       └── logging_config.py       stdout logging
-├── tests/                          86 tests, no model needed
+├── tests/                          112 tests, no model and no database needed
+├── db_e2e.py                       auth + persistence against a real Postgres
+├── pdf_regen_test.py               rebuilding a filed report's document
+├── official_e2e.py                 the official role, the queue, and its limits
 ├── tools/check_model.py            verify best.pt loads and print its classes
 ├── weights/best.pt                 <- your trained model goes here
 ├── test_client.html                browser test page with live GPS
 ├── build.sh                        Render build (CPU torch, headless cv2)
-├── render.yaml                     Render blueprint
 ├── requirements.txt
 ├── .env.example
+├── .env.aiven.example              DATABASE_URL, JWT_SECRET, OFFICIAL_EMAILS
 ├── TRAINING.md
 └── README.md
 ```
@@ -629,7 +764,7 @@ FastAPI.** That is what makes the pipeline testable without a web server.
 
 ---
 
-## 8. Tests
+## 9. Tests
 
 ```bash
 pip install -r requirements-dev.txt
@@ -660,15 +795,26 @@ python tools/check_model.py
 
 ---
 
-## 9. Deploying to Render (free tier)
+## 10. Deploying to Render (free tier)
 
 1. Push this repository to GitHub.
 2. In Render: **New +** -> **Blueprint** -> select the repository. `render.yaml`
-   is picked up automatically. (If `backend/` is your repository root, delete the
-   `rootDir: backend` line first.)
-3. In the service's **Environment** tab set `FRONTEND_URL` to your deployed
-   frontend origin, e.g. `https://road-health.vercel.app` (no trailing slash).
-4. Deploy. First build takes 5-10 minutes, mostly PyTorch.
+   lives at the **repository root** - that is where Render looks, and each
+   service names its own `rootDir` from there.
+3. The blueprint brings up **two** services: `roadguard-api` and the static
+   site `roadguard-ui`. They reference each other's hostnames, so no URL is
+   pasted twice - the API learns the UI's origin for CORS, and the UI is built
+   against the API's host. Render supplies both as bare hostnames with no
+   scheme; `app/config.py` and `src/lib/api.js` each add one, which is the only
+   reason this works.
+4. Render prompts for the values marked `sync: false`. Set them:
+   * `DATABASE_URL` - the Aiven connection string
+   * `JWT_SECRET` - at least 32 bytes; generate with
+     `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`
+   * `OFFICIAL_EMAILS` - who may acknowledge and resolve (see section 4). Leave
+     it blank and every account is a citizen.
+   * `EXTRA_CORS_ORIGINS` - optional; a custom domain or a preview URL.
+5. Deploy. First build takes 5-10 minutes, mostly PyTorch.
 5. Check `https://<your-service>.onrender.com/health`.
 
 Doing it manually instead of with the blueprint:
@@ -683,17 +829,22 @@ or the platform cannot reach the process.
 
 ### Getting `best.pt` onto Render
 
-`weights/*.pt` is gitignored because model files are large. Pick one:
+Already done: `.gitignore` ignores `weights/*.pt` but re-includes
+`!weights/best.pt`, and the 5.3 MB trained model is committed. Worth knowing
+why the exception is written that way - without it `git add weights/best.pt`
+fails **silently**, the push succeeds, and Render serves the generic COCO model
+to citizens filing municipal complaints.
 
-* **Git LFS** - `git lfs track "backend/weights/*.pt"`, then commit normally.
-* **Download at build time** - upload `best.pt` as a GitHub Release asset and add
-  to `build.sh`: `curl -L -o weights/best.pt "<public-url>"`.
-* **Commit it directly** - acceptable for a small nano model (5-10 MB) if you
-  remove the ignore rule. Simplest option for a college project.
+That is also why the blueprint sets `ALLOW_PRETRAINED_FALLBACK=false` in
+production. The fallback exists so the API can start before you have trained
+anything; it must never quietly stand in for a model that failed to deploy.
+
+If the model ever outgrows what a repository should hold (say past 100 MB),
+switch to Git LFS or download it in `build.sh` from a GitHub Release.
 
 ---
 
-## 10. Performance on Render's free tier - be realistic
+## 11. Performance on Render's free tier - be realistic
 
 A free instance is **0.1 CPU (shared) and 512 MB RAM**. Measured expectations:
 
@@ -725,7 +876,7 @@ or export the model to ONNX and run it with `onnxruntime`.
 
 ---
 
-## 11. Security
+## 12. Security
 
 * **File type** checked three times: declared MIME type, file extension, and the
   real format Pillow detects after decoding (a `.txt` renamed to `.jpg` is rejected).
@@ -752,7 +903,7 @@ an API key or a reverse proxy with rate limiting.
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
