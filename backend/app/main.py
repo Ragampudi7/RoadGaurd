@@ -106,7 +106,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    # PATCH and DELETE arrived with the report endpoints. A missing verb here
+    # does not fail a test-client call - it fails the browser's preflight with
+    # a 400 that never reaches a route, so only a real browser catches it.
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     max_age=3600,
 )

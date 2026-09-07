@@ -134,6 +134,14 @@ class ModelInfo(BaseModel):
         description="'trained' = your own road-defect weights; 'pretrained_fallback' = generic COCO model; 'unavailable' = no model loaded",
     )
     name: str
+    version: str = Field(
+        default="unknown",
+        description=(
+            "Fingerprint of the weights actually loaded, e.g. 'yolo11n-3f9c2a1b'. "
+            "Stored on every report: a PDF regenerated under different weights is "
+            "a different document, and the version is how that is noticed."
+        ),
+    )
     task: str = "detect"
     classes: List[str] = Field(default_factory=list)
     device: str = "cpu"

@@ -23,7 +23,13 @@ from app.api.auth import current_user
 from app.config import Settings, get_settings
 from app.db.base import get_session
 from app.db.models import Report, User
-from app.utils.errors import ForbiddenError, NotFoundError
+from app.utils.errors import (
+    ForbiddenError,
+    ImageTooLargeError,
+    InvalidImageError,
+    NotFoundError,
+    UnsupportedImageTypeError,
+)
 
 router = APIRouter(tags=["reports"])
 
@@ -64,6 +70,12 @@ class ReportCreate(BaseModel):
     image_sha256: str | None = Field(default=None, max_length=64)
     image_width: int | None = None
     image_height: int | None = None
+    # The photograph is the evidence. Without it a report is an assertion about
+    # a road nobody can look at, and GET /reports/{id}/image has nothing to
+    # serve. Base64 of the ORIGINAL upload, not the annotated render - the
+    # annotation is derived and can be recomputed; the photograph cannot.
+    image_base64: str | None = Field(default=None, repr=False)
+    image_mime: str | None = Field(default=None, max_length=40)
 
     complaint_description: str | None = None
     addressed_to: str | None = Field(default=None, max_length=240)
@@ -144,6 +156,49 @@ def _reference() -> str:
     return f"RHA-{stamp}-{uuid.uuid4().hex[:6].upper()}"
 
 
+def _decode_photo(body: ReportCreate, settings: Settings) -> tuple[bytes | None, str | None]:
+    """
+    Turn the submitted base64 photograph into bytes, or refuse it.
+
+    Three ways this can be wrong, and all three are the client's fault rather
+    than a server error: malformed base64, a file over the upload limit, and a
+    payload that does not match the hash the client also sent (which would mean
+    the stored evidence is not the image that was analysed).
+    """
+    if not body.image_base64:
+        return None, None
+
+    import base64
+    import hashlib
+
+    try:
+        raw = base64.b64decode(body.image_base64, validate=True)
+    except Exception:
+        raise InvalidImageError("image_base64 is not valid base64.")
+
+    if not raw:
+        raise InvalidImageError("image_base64 decoded to an empty file.")
+
+    if len(raw) > settings.max_image_size_bytes:
+        raise ImageTooLargeError(
+            f"The photograph is {len(raw) / 1e6:.1f} MB; the limit is "
+            f"{settings.max_image_size_mb:.0f} MB."
+        )
+
+    if body.image_sha256:
+        actual = hashlib.sha256(raw).hexdigest()
+        if actual != body.image_sha256.lower():
+            raise InvalidImageError(
+                "The photograph does not match the image_sha256 sent with it. "
+                "Storing it would attach the wrong evidence to this report."
+            )
+
+    mime = (body.image_mime or "image/jpeg").lower()
+    if mime not in {"image/jpeg", "image/png", "image/webp"}:
+        raise UnsupportedImageTypeError(f"Cannot store '{mime}'. Use JPG, PNG or WEBP.")
+    return raw, mime
+
+
 async def _owned(report_id: uuid.UUID, user: User, session: AsyncSession) -> Report:
     report = await session.get(Report, report_id)
     if report is None:
@@ -161,12 +216,16 @@ async def create_report(
     body: ReportCreate,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ):
+    image_bytes, image_mime = _decode_photo(body, settings)
     report = Report(
         user_id=user.id,
         reference=_reference(),
         status="Submitted" if body.submit else "Draft",
-        **body.model_dump(exclude={"submit"}),
+        image_bytes=image_bytes,
+        image_mime=image_mime,
+        **body.model_dump(exclude={"submit", "image_base64", "image_mime"}),
     )
     session.add(report)
     await session.flush()

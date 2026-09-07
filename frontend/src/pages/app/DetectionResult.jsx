@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { FileDown, Save, RotateCcw, ImageOff } from "lucide-react";
+import { FileDown, Save, Send, RotateCcw, ImageOff } from "lucide-react";
 import { useDetection } from "../../context/DetectionContext";
 import { useReports } from "../../context/ReportsContext";
 import { ScoreGauge, RiskPanel, DetectionTable } from "../../components/Results";
@@ -8,10 +8,12 @@ import { generateReportPdf } from "../../lib/reportPdf";
 import { useState } from "react";
 
 export default function DetectionResult() {
-  const { result, imageUrl, clear, isMock } = useDetection();
+  const { result, imageUrl, file, clear, isMock } = useDetection();
   const { saveDraft } = useReports();
   const nav = useNavigate();
   const [saved, setSaved] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState(null);
 
   if (!result) {
     return (
@@ -23,20 +25,19 @@ export default function DetectionResult() {
     );
   }
 
-  function onSave() {
-    const row = saveDraft({
-      title: `Report at ${result.location.latitude.toFixed(4)}, ${result.location.longitude.toFixed(4)}`,
-      score: result.road_health_score,
-      condition: result.road_condition,
-      risk_index: result.risk.risk_index,
-      risk_level: result.risk.risk_level,
-      tier: result.risk.priority_tier,
-      defects: result.total_defects,
-      lat: result.location.latitude,
-      lon: result.location.longitude,
-      is_demo: !!result.is_demo,
-    });
-    setSaved(row.id);
+  async function onSave(submit) {
+    setSaving(true); setSaveErr(null);
+    try {
+      // The photograph goes with it. A complaint without the picture is an
+      // assertion the authority cannot check, and the stored report is what a
+      // regenerated PDF is built from.
+      const row = await saveDraft(result, { submit, file });
+      setSaved(row.reference ?? row.id);
+    } catch (e) {
+      setSaveErr(e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -48,8 +49,11 @@ export default function DetectionResult() {
           <button className="btn btn-ghost" onClick={() => { clear(); nav("/app/upload"); }}>
             <RotateCcw size={15} /> New analysis
           </button>
-          <button className="btn btn-ghost" onClick={onSave} disabled={!!saved}>
-            <Save size={15} /> {saved ? `Saved ${saved}` : "Save as draft"}
+          <button className="btn btn-ghost" onClick={() => onSave(false)} disabled={!!saved || saving}>
+            <Save size={15} /> {saved ? `Saved ${saved}` : saving ? "Saving…" : "Save as draft"}
+          </button>
+          <button className="btn btn-ghost" onClick={() => onSave(true)} disabled={!!saved || saving}>
+            <Send size={15} /> File now
           </button>
           <button className="btn btn-primary"
                   onClick={() => generateReportPdf(result, { demo: isMock || result.is_demo, imageUrl })}>
@@ -62,6 +66,12 @@ export default function DetectionResult() {
         <div className="glass-soft demo-stripe p-3.5 text-[13px] text-[color:var(--color-fair)]">
           These figures are sample data and describe no real road. The exported
           PDF is watermarked accordingly and must not be submitted to any authority.
+        </div>
+      )}
+
+      {saveErr && (
+        <div className="glass-soft border-[color:var(--color-danger)]/40 p-3.5 text-[13px] text-[color:var(--color-danger)]" role="alert">
+          Could not save — {saveErr.message}
         </div>
       )}
 

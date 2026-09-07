@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { USE_MOCK } from "../lib/api";
 import { ShieldAlert } from "lucide-react";
 
 export default function AuthLayout({ title, sub, children, footer }) {
@@ -43,9 +44,9 @@ export default function AuthLayout({ title, sub, children, footer }) {
           {footer && <div className="mt-6 text-sm text-[color:var(--color-muted)]">{footer}</div>}
 
           <p className="mt-8 text-[11.5px] leading-relaxed text-[color:var(--color-muted)]">
-            Accounts are not real yet — sign-in is a local demo that stores a
-            profile in this browser only. It gates navigation, not data. Real
-            accounts arrive with the database.
+            {USE_MOCK
+              ? "Demo sign-in: no password is checked and nothing reaches a server. The profile is a key in this browser, so it gates navigation, not data."
+              : "Passwords are hashed with bcrypt and never stored or logged in plain text. Your session is a signed token held in this browser."}
           </p>
         </div>
       </div>

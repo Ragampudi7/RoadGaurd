@@ -1,66 +1,127 @@
 /**
- * Thin client for the Road Health API.
+ * Client for the Road Health API.
  *
- * The base URL comes from VITE_API_BASE at build time so the same source
- * deploys against localhost and against Render without edits.
+ * Two switches, both read at build time by Vite:
+ *   VITE_API_BASE   where the backend lives
+ *   VITE_USE_MOCK   "true" keeps the app on fixed sample data (see mockData.js)
+ *
+ * When mock mode is off, every context in this app talks to the real backend
+ * and nothing is stored in the browser except the session token.
  */
 
 export const API_BASE = (
   import.meta.env.VITE_API_BASE || "http://localhost:8000"
 ).replace(/\/+$/, "");
 
-/**
- * The backend returns errors as {success:false, error:{code, message}}.
- * Surface that message rather than a bare HTTP status, since the codes are
- * meaningful (unsupported_media_type, image_too_large, model_unavailable...).
- */
-async function unwrap(res) {
-  let body = null;
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
+
+const TOKEN_KEY = "roadguard_token";
+
+/* ------------------------------------------------------------------ token --
+   Kept in localStorage so a refresh does not sign the user out. That is the
+   usual XSS tradeoff: any script running on this origin can read it. Acceptable
+   for this app, and the reason the backend keeps token lifetime short. */
+export function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+export function setToken(t) {
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ }
+}
+
+/* ------------------------------------------------------------------ core -- */
+class ApiError extends Error {
+  constructor(message, { code, status } = {}) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
+async function request(path, { method = "GET", body, form, auth = true, signal } = {}) {
+  const headers = {};
+  if (auth) {
+    const t = getToken();
+    if (t) headers.Authorization = `Bearer ${t}`;
+  }
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+
+  let res;
   try {
-    body = await res.json();
-  } catch {
-    throw new Error(`Server returned ${res.status} with a non-JSON body.`);
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
+      signal,
+    });
+  } catch (e) {
+    if (e.name === "AbortError") throw e;
+    // fetch only rejects on network/CORS failure, which is by far the most
+    // common problem in practice and deserves a message that says so.
+    throw new ApiError(
+      `Cannot reach the API at ${API_BASE}. Check the backend is running and that this origin is in its CORS allow-list.`,
+      { code: "network_error" }
+    );
   }
-  if (!res.ok || body?.success === false) {
-    const err = body?.error ?? {};
-    const e = new Error(err.message || `Request failed (${res.status}).`);
-    e.code = err.code;
-    e.status = res.status;
-    throw e;
+
+  if (res.status === 204) return null;
+
+  let payload = null;
+  try { payload = await res.json(); } catch { /* empty or non-JSON body */ }
+
+  if (!res.ok || payload?.success === false) {
+    const err = payload?.error ?? {};
+    // A 401 means the stored token is dead; drop it so the UI can show the
+    // signed-out state instead of retrying forever with a bad credential.
+    if (res.status === 401) setToken(null);
+    throw new ApiError(err.message || `Request failed (${res.status}).`,
+                       { code: err.code, status: res.status });
   }
-  return body;
+  return payload;
 }
 
-export async function getHealth() {
-  const res = await fetch(`${API_BASE}/health`);
-  return unwrap(res);
-}
+/* ------------------------------------------------------------------ auth -- */
+export const auth = {
+  signup: (b) => request("/auth/signup", { method: "POST", body: b, auth: false }),
+  login: (b) => request("/auth/login", { method: "POST", body: b, auth: false }),
+  me: () => request("/auth/me"),
+  updateMe: (b) => request("/auth/me", { method: "PATCH", body: b }),
+};
 
-/**
- * POST /analyze — multipart image + coordinates.
- * includeImage / includePdf map to the query flags that let the caller skip
- * the expensive base64 payloads for a fast preview.
- */
+/* --------------------------------------------------------------- reports -- */
+export const reports = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+    );
+    return request(`/reports${qs.toString() ? `?${qs}` : ""}`);
+  },
+  get: (id) => request(`/reports/${id}`),
+  create: (b) => request("/reports", { method: "POST", body: b }),
+  setStatus: (id, status) => request(`/reports/${id}/status`, { method: "PATCH", body: { status } }),
+  remove: (id) => request(`/reports/${id}`, { method: "DELETE" }),
+  stats: (params = {}) => {
+    const qs = new URLSearchParams(params);
+    return request(`/reports/stats${qs.toString() ? `?${qs}` : ""}`);
+  },
+  imageUrl: (id) => `${API_BASE}/reports/${id}/image`,
+};
+
+/* --------------------------------------------------------------- analyse -- */
 export async function analyze({ file, latitude, longitude, includeImage = true, includePdf = true, signal }) {
   const form = new FormData();
   form.append("image", file);
   form.append("latitude", String(latitude));
   form.append("longitude", String(longitude));
-
   const qs = new URLSearchParams({
     include_image: String(includeImage),
     include_pdf: String(includePdf),
   });
-
-  const res = await fetch(`${API_BASE}/analyze?${qs}`, {
-    method: "POST",
-    body: form,
-    signal,
-  });
-  return unwrap(res);
+  return request(`/analyze?${qs}`, { method: "POST", form, signal });
 }
 
-/** Turn a base64 payload from the API into a blob URL for <img> or download. */
+export const getHealth = () => request("/health", { auth: false });
+
+/** base64 payload -> blob URL for <img src> or a download link. */
 export function b64ToUrl(b64, mime) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -68,23 +129,4 @@ export function b64ToUrl(b64, mime) {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 }
 
-export const CONDITION_COLOUR = {
-  Good: "var(--good)",
-  Fair: "var(--fair)",
-  Poor: "var(--poor)",
-  Dangerous: "var(--danger)",
-};
-
-export const RISK_COLOUR = {
-  Critical: "var(--critical)",
-  High: "var(--high)",
-  Moderate: "var(--moderate)",
-  Low: "var(--low)",
-};
-
-export const SEVERITY_COLOUR = {
-  Critical: "var(--critical)",
-  High: "var(--high)",
-  Medium: "var(--moderate)",
-  Minor: "var(--minor)",
-};
+export { ApiError };

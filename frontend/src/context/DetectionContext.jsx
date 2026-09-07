@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import { mockDetectionResult } from "../lib/mockData";
-import { analyze as callApi } from "../lib/api";
+import { analyze as callApi, USE_MOCK as API_USE_MOCK } from "../lib/api";
 
 /**
  * Detection state.
@@ -9,7 +9,7 @@ import { analyze as callApi } from "../lib/api";
  * to false (or set VITE_USE_MOCK=false) and every screen keeps working, because
  * mockDetectionResult is shaped exactly like the real AnalyzeResponse.
  */
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
+export const USE_MOCK = API_USE_MOCK;
 
 const DetectionCtx = createContext(null);
 

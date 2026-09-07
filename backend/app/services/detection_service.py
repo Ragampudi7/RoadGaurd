@@ -27,8 +27,10 @@ installed.
 
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PIL import Image
@@ -60,6 +62,7 @@ class RoadDefectDetector:
         self._model: Any = None
         self._status: str = STATUS_UNAVAILABLE
         self._model_name: str = "none"
+        self._model_version: str = "unknown"
         self._class_names: List[str] = []
         self._load_error: Optional[str] = None
         # Ultralytics models are not thread-safe; serialise access.
@@ -127,6 +130,8 @@ class RoadDefectDetector:
         self._model = model
         self._status = status
         self._model_name = weights_path.name if status == STATUS_TRAINED else target
+        self._model_version = self._fingerprint(weights_path if status == STATUS_TRAINED else None,
+                                                model, target)
         self._load_error = None
         logger.info(
             "Model ready in %.2fs | status=%s | classes=%s",
@@ -134,6 +139,41 @@ class RoadDefectDetector:
             status,
             self._class_names or "(none reported)",
         )
+
+    @staticmethod
+    def _fingerprint(weights: Optional[Path], model: Any, target: str) -> str:
+        """
+        A short, stable identifier for the weights in memory.
+
+        Content-hashed rather than hand-maintained: a version number someone has
+        to remember to bump is a version number that lies after the first
+        retrain. Retraining changes the file, so it changes this string.
+        """
+        # Prefer the architecture the checkpoint was built from ("yolo11n") over
+        # the filename ("best"), which says nothing to anyone reading a report.
+        arch = "yolo"
+        try:
+            cfg = getattr(getattr(model, "model", None), "yaml", None) or {}
+            arch = Path(str(cfg.get("yaml_file") or "")).stem or arch
+        except Exception:  # pragma: no cover - defensive
+            pass
+        if arch == "yolo":
+            try:
+                arch = Path(getattr(model, "ckpt_path", "") or target).stem or arch
+            except Exception:  # pragma: no cover - defensive
+                pass
+
+        if weights is None:
+            return f"{arch}-pretrained"
+
+        try:
+            digest = hashlib.sha256()
+            with weights.open("rb") as fh:
+                for block in iter(lambda: fh.read(1 << 20), b""):
+                    digest.update(block)
+            return f"{arch}-{digest.hexdigest()[:8]}"
+        except OSError:  # pragma: no cover - unreadable weights would have failed earlier
+            return f"{arch}-unknown"
 
     def unload(self) -> None:
         self._model = None
@@ -161,6 +201,7 @@ class RoadDefectDetector:
         return ModelInfo(
             status=self._status,
             name=self._model_name,
+            version=self._model_version,
             classes=self._class_names,
             device="cpu",
             confidence_threshold=self.settings.confidence_threshold,
