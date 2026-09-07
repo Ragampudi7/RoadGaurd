@@ -9,6 +9,7 @@ import Upload from "./pages/app/Upload";
 import DetectionResult from "./pages/app/DetectionResult";
 import Reports from "./pages/app/Reports";
 import Profile from "./pages/app/Profile";
+import Queue from "./pages/app/Queue";
 
 /* Recharts and Leaflet are the two heaviest dependencies and neither is needed
    to render the landing page, so they load only when their route is opened. */
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="upload" element={<Upload />} />
         <Route path="result" element={<DetectionResult />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="queue" element={<ProtectedRoute role="official"><Queue /></ProtectedRoute>} />
         <Route path="map" element={<Suspense fallback={<Loading />}><MapView /></Suspense>} />
         <Route path="profile" element={<Profile />} />
       </Route>

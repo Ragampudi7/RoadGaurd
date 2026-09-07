@@ -187,3 +187,52 @@ def test_cors_entries_become_real_origins(given, expected):
     from app.config import _as_origin
 
     assert _as_origin(given) == expected
+
+
+# ------------------------------------------------------------ who is staff --
+@pytest.mark.parametrize(
+    "allow_list, address, expected",
+    [
+        ("", "anyone@example.com", "citizen"),
+        ("@ghmc.gov.in", "engineer@ghmc.gov.in", "official"),
+        ("@ghmc.gov.in", "ENGINEER@GHMC.GOV.IN", "official"),
+        ("@ghmc.gov.in", "engineer@ghmc.gov.in.evil.com", "citizen"),
+        ("@ghmc.gov.in", "citizen@example.com", "citizen"),
+        ("named@x.com", "named@x.com", "official"),
+        ("named@x.com", "other@x.com", "citizen"),
+        ("a@x.com, @y.gov", "someone@y.gov", "official"),
+    ],
+)
+def test_official_allow_list(allow_list, address, expected):
+    """
+    The role comes from deployment configuration, never from the request.
+
+    The third case is the one that matters: a suffix match on "@ghmc.gov.in"
+    must not hand the role to anyone who can register
+    ghmc.gov.in.attacker.com, so the comparison is on the end of the address
+    and the entry carries its own leading "@".
+    """
+    from app.config import Settings
+
+    assert Settings(official_emails=allow_list).role_for(address) == expected
+
+
+# ----------------------------------------------------- who may change what --
+def test_neither_role_can_do_the_other_s_job():
+    """
+    The two transition tables are the grievance workflow. A citizen files and
+    withdraws; an authority acknowledges and resolves. Neither reaches into
+    the other's half - a citizen self-resolving would make the status
+    meaningless, and an official un-filing a complaint would erase one.
+    """
+    from app.api.reports import CITIZEN_TRANSITIONS, OFFICIAL_TRANSITIONS
+
+    citizen_can = {t for targets in CITIZEN_TRANSITIONS.values() for t in targets}
+    official_can = {t for targets in OFFICIAL_TRANSITIONS.values() for t in targets}
+
+    assert "Acknowledged" not in citizen_can and "Resolved" not in citizen_can
+    assert "Draft" not in official_can
+    # A citizen may take a report back before the authority has touched it.
+    assert CITIZEN_TRANSITIONS["Submitted"] == {"Draft"}
+    # An authority may reopen a resolution that did not hold.
+    assert "Acknowledged" in OFFICIAL_TRANSITIONS["Resolved"]

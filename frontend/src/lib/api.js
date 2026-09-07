@@ -30,7 +30,10 @@ export function getToken() {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 export function setToken(t) {
-  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ }
+  try {
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch { /* private mode */ }
 }
 
 /* ------------------------------------------------------------------ core -- */
@@ -109,7 +112,39 @@ export const reports = {
     return request(`/reports/stats${qs.toString() ? `?${qs}` : ""}`);
   },
   imageUrl: (id) => `${API_BASE}/reports/${id}/image`,
+
+  /**
+   * Fetch the rebuilt PDF as a blob.
+   *
+   * It cannot be a plain <a href> or a new-tab navigation: the endpoint needs
+   * the Authorization header, and a browser sends none on either. So fetch it,
+   * then hand the blob to a temporary object URL.
+   */
+  async pdf(id) {
+    const res = await fetch(`${API_BASE}/reports/${id}/pdf`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) {
+      let message = `Could not rebuild the report (${res.status}).`;
+      try { message = (await res.json())?.error?.message || message; } catch { /* not JSON */ }
+      throw new ApiError(message, { status: res.status });
+    }
+    return res.blob();
+  },
 };
+
+/** Save a blob under `filename`, then release the object URL. */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoking immediately can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
 /* --------------------------------------------------------------- analyse -- */
 export async function analyze({ file, latitude, longitude, includeImage = true, includePdf = true, signal }) {

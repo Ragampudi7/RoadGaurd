@@ -84,6 +84,16 @@ services:
       - key: JWT_EXPIRES_HOURS
         value: "72"
 
+      # -- who counts as a municipal official --
+      # Comma-separated whole addresses ("engineer@ghmc.gov.in") or domain
+      # suffixes ("@ghmc.gov.in"). Anyone not listed signs up as a citizen.
+      # There is no field on the signup form for this and no invite code: the
+      # role is granted by whoever configures the deployment, and re-checked
+      # at every login, so adding an address promotes that account on its next
+      # sign-in without touching the database.
+      - key: OFFICIAL_EMAILS
+        sync: false
+
       # -- CORS --
       # The static site's hostname, resolved by Render at deploy time.
       - key: FRONTEND_URL

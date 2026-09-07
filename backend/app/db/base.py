@@ -91,11 +91,52 @@ def init_engine(settings) -> AsyncEngine | None:
 
 
 async def create_all() -> None:
-    """Create tables if absent. Alembic owns migrations; this is for dev/tests."""
+    """
+    Bring the live schema up to what the models declare.
+
+    ``create_all`` only ever CREATES tables - on a database whose tables
+    already exist it does nothing at all, silently, including when a model has
+    grown a column since. That failure mode is nasty because it never appears
+    in development: a fresh local database gets the new column from the create,
+    the deployed one does not, and the first insert fails at runtime with
+    ``UndefinedColumnError``. So after creating, reconcile.
+
+    Only additive, non-destructive changes are applied: a column the models
+    declare, the table lacks, and which is nullable or has a default. Anything
+    else - a dropped column, a changed type, a new NOT NULL over existing rows -
+    is logged loudly and left alone, because those need a real migration that
+    decides what happens to the data already there.
+    """
     if _engine is None:
         return
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_add_missing_columns)
+
+
+def _add_missing_columns(conn) -> None:
+    from sqlalchemy import inspect, text
+    from sqlalchemy.schema import CreateColumn
+
+    inspector = inspect(conn)
+    existing_tables = set(inspector.get_table_names())
+
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue                                    # create_all just made it
+        present = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in present:
+                continue
+            if not column.nullable and column.default is None and column.server_default is None:
+                log.error(
+                    "Column %s.%s is missing from the database and is NOT NULL with no "
+                    "default. Add it with a migration that decides what existing rows "
+                    "should hold; refusing to guess.", table.name, column.name)
+                continue
+            ddl = CreateColumn(column).compile(conn.engine).string
+            conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN {ddl}'))
+            log.warning("Added missing column %s.%s", table.name, column.name)
 
 
 async def dispose_engine() -> None:

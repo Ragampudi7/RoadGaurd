@@ -182,6 +182,7 @@ def run_assessment(
             "source_size": (width, height),
             "model_status": detector.status,
             "model_name": detector.info().name,
+            "model_version": detector.info().version,
             "model_classes": detector.info().classes,
             "is_road_defect_model": is_real_model,
             "confidence_threshold": settings.confidence_threshold,
