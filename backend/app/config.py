@@ -22,6 +22,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _as_origin(value: str) -> str:
+    """
+    Normalise one CORS entry into a browser origin.
+
+    Render's blueprint fills FRONTEND_URL from another service's `host`
+    property, which is a bare hostname - "roadguard-ui.onrender.com". The
+    browser sends an Origin header with a scheme, so a bare host never matches
+    and every request is blocked by CORS with nothing in the logs to explain
+    it. Assume https for a bare host; localhost stays http.
+    """
+    item = value.strip().rstrip("/")
+    if not item or item == "*" or "://" in item:
+        return item
+    host = item.split(":", 1)[0]
+    scheme = "http" if host in {"localhost", "127.0.0.1", "0.0.0.0"} else "https"
+    return f"{scheme}://{item}"
+
+
 # ---------------------------------------------------------------------------
 # Road-health classification bands
 # ---------------------------------------------------------------------------
@@ -264,7 +282,7 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Origins allowed to call this API from a browser."""
         raw = [self.frontend_url] + self.extra_cors_origins.split(",")
-        origins = [item.strip().rstrip("/") for item in raw if item and item.strip()]
+        origins = [_as_origin(item) for item in raw if item and item.strip()]
         if "*" in origins:
             return ["*"]
         # Local development conveniences, harmless in production.
