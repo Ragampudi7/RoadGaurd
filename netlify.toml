@@ -1,0 +1,55 @@
+# Netlify hosts the frontend. It cannot host the API: there is no persistent
+# Python process, and Netlify Functions cap at 250 MB unzipped while PyTorch
+# alone is larger than that. So this deployment serves the interface, and
+# VITE_USE_MOCK decides what fills it.
+
+[build]
+  # No `base` key on purpose. When base is set, Netlify resolves `publish`
+  # relative to it, and `base = "frontend"` with `publish = "frontend/dist"`
+  # quietly becomes frontend/frontend/dist - a deploy that succeeds and
+  # publishes nothing. Running from the repo root removes the ambiguity.
+  command = "cd frontend && npm ci && npm run build"
+  publish = "frontend/dist"
+
+[build.environment]
+  # Vite 8 needs Node 20+.
+  NODE_VERSION = "22"
+
+  # DEMO MODE. Every figure on this deployment comes from
+  # frontend/src/lib/mockData.js, not from the model, and the UI says so on
+  # every screen that shows a number.
+  #
+  # To serve real analyses instead, set both of these in Netlify's UI
+  # (Site configuration -> Environment variables) and redeploy:
+  #
+  #     VITE_USE_MOCK = false
+  #     VITE_API_BASE = your-api-host.example.com
+  #
+  # A redeploy, not a restart: Vite compiles these into the bundle at build
+  # time. And the API must allow this site's origin - set FRONTEND_URL on the
+  # backend to the Netlify domain, or every request fails on CORS.
+  VITE_USE_MOCK = "true"
+
+# BrowserRouter serves every route from index.html. Without this, a visitor
+# who refreshes on /app/reports asks the CDN for a file that was never built
+# and gets a 404 instead of a React route. Must stay last among redirects:
+# it matches everything.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Vite fingerprints these filenames, so the content can never change under a
+# given name and it is safe to cache forever. index.html deliberately is not
+# cached this way - it is what points at the current fingerprints.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
