@@ -1,0 +1,129 @@
+# Render blueprint for RoadGuard AI.
+#
+# This file must sit at the REPOSITORY ROOT, not inside backend/. Render looks
+# for render.yaml at the root and reads `rootDir` per service from there.
+#
+# To deploy: push this repo to GitHub, then in Render pick
+# "New +" -> "Blueprint" and point it at the repository.
+#
+# Two secrets are deliberately NOT in this file and must be set in the Render
+# dashboard (both are marked `sync: false`, so Render prompts for them):
+#
+#   DATABASE_URL  the Aiven connection string
+#   JWT_SECRET    at least 32 bytes; the app refuses to start in production
+#                 with the development default (RFC 7518 section 3.2)
+#
+# The two services reference each other's hostnames, so neither URL has to be
+# pasted by hand: the API learns the UI's origin for CORS, and the UI is built
+# against the API's host. Both arrive as bare hostnames without a scheme -
+# app/config.py and src/lib/api.js each add one.
+
+services:
+  # ------------------------------------------------------------------ API --
+  - type: web
+    name: roadguard-api
+    runtime: python
+    plan: free
+    region: singapore          # closest free region to India; change if needed
+    rootDir: backend
+    buildCommand: "bash build.sh"
+    # Render injects $PORT - it must never be hardcoded.
+    # One worker only: a free instance has 512 MB RAM and a YOLO process needs
+    # most of it. Extra workers cause out-of-memory restarts, not throughput.
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 65"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+
+      # -- model --
+      - key: MODEL_PATH
+        value: weights/best.pt
+      # weights/best.pt is committed (5.3 MB), so the generic COCO model must
+      # never stand in for it: its detections are not road defects and a report
+      # built from them would be addressed to a municipal body regardless.
+      - key: ALLOW_PRETRAINED_FALLBACK
+        value: "false"
+      - key: FALLBACK_MODEL_NAME
+        value: yolo11n.pt
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.25"
+      - key: IOU_THRESHOLD
+        value: "0.45"
+      - key: INFERENCE_IMAGE_SIZE
+        value: "640"
+      - key: MAX_IMAGE_SIZE_MB
+        value: "10"
+      - key: AREA_METHOD
+        value: sum
+      - key: INCLUDE_DEFECT_CROPS
+        value: "true"
+      - key: MAX_CONCURRENT_INFERENCES
+        value: "1"
+      # Torch spawns one thread per core by default and then fights itself on a
+      # shared-CPU instance. Pinning to a single thread is measurably faster here.
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      # Ultralytics writes a settings file and a fonts cache; point them at a
+      # writable location and keep telemetry off.
+      - key: YOLO_CONFIG_DIR
+        value: /tmp/ultralytics
+
+      # -- persistence and auth (set in the dashboard, never committed) --
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_HOURS
+        value: "72"
+
+      # -- CORS --
+      # The static site's hostname, resolved by Render at deploy time.
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: roadguard-ui
+          property: host
+      # Room for a custom domain or a preview URL later.
+      - key: EXTRA_CORS_ORIGINS
+        sync: false
+
+  # ------------------------------------------------------------------- UI --
+  - type: web
+    name: roadguard-ui
+    runtime: static
+    rootDir: frontend
+    # npm ci needs the committed package-lock.json and is reproducible;
+    # npm install is not.
+    buildCommand: "npm ci && npm run build"
+    staticPublishPath: ./dist
+    autoDeploy: true
+    # BrowserRouter serves every route from index.html; without this rewrite a
+    # refresh on /app/reports is a 404 from the CDN, not a React route.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        # Vite fingerprints these filenames, so they can be cached forever.
+        value: public, max-age=31536000, immutable
+    envVars:
+      # Vite reads these at BUILD time. Changing either one needs a redeploy,
+      # not a restart.
+      - key: VITE_API_BASE
+        fromService:
+          type: web
+          name: roadguard-api
+          property: host
+      # The demo data is for running without a backend. This deployment has one.
+      - key: VITE_USE_MOCK
+        value: "false"

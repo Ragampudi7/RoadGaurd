@@ -162,3 +162,28 @@ def test_pretrained_fallback_is_labelled_as_such(tmp_path):
             yaml = {"yaml_file": "yolo11n.yaml"}
 
     assert RoadDefectDetector._fingerprint(None, FakeModel(), "yolo11n.pt") == "yolo11n-pretrained"
+
+
+# --------------------------------------------------------------- cors hosts --
+@pytest.mark.parametrize(
+    "given, expected",
+    [
+        # What Render's blueprint actually passes: a bare hostname.
+        ("roadguard-ui.onrender.com", "https://roadguard-ui.onrender.com"),
+        ("https://roadguard-ui.onrender.com/", "https://roadguard-ui.onrender.com"),
+        ("http://localhost:5173", "http://localhost:5173"),
+        ("localhost:5173", "http://localhost:5173"),
+        ("127.0.0.1:3000", "http://127.0.0.1:3000"),
+        ("*", "*"),
+    ],
+)
+def test_cors_entries_become_real_origins(given, expected):
+    """
+    A bare hostname in the allow-list matches no Origin header the browser will
+    ever send, so every request is refused by CORS and the server log shows a
+    perfectly ordinary preflight. Adding the scheme here is what keeps that
+    from being the first thing that happens after a deploy.
+    """
+    from app.config import _as_origin
+
+    assert _as_origin(given) == expected

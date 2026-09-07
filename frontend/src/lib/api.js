@@ -9,9 +9,14 @@
  * and nothing is stored in the browser except the session token.
  */
 
-export const API_BASE = (
-  import.meta.env.VITE_API_BASE || "http://localhost:8000"
-).replace(/\/+$/, "");
+// Render's blueprint supplies this from the API service's `host` property,
+// which is a bare hostname with no scheme. fetch() cannot use that, so add one
+// rather than making the deploy depend on somebody remembering to type https://.
+const RAW_BASE = (import.meta.env.VITE_API_BASE || "http://localhost:8000")
+  .trim()
+  .replace(/\/+$/, "");
+
+export const API_BASE = /^https?:\/\//i.test(RAW_BASE) ? RAW_BASE : `https://${RAW_BASE}`;
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
 
