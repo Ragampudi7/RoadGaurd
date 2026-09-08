@@ -64,13 +64,24 @@ async def health() -> HealthResponse:
     Always answers 200 so the platform does not restart a container that is
     otherwise fine; ``status`` is ``degraded`` when no model is loaded.
     """
+    from app.db.base import database_enabled, engine_ready
+
     detector = get_detector()
+    # Three distinct states, and the difference matters to whoever is reading
+    # this probe: no database asked for, one asked for and working, or one
+    # asked for and unreachable. The last is the only one that needs someone.
+    if not database_enabled(settings):
+        persistence = "disabled"
+    else:
+        persistence = "enabled" if engine_ready() else "unavailable"
+
     return HealthResponse(
         status="ok" if detector.is_ready else "degraded",
         version=settings.app_version,
         uptime_seconds=round(time.monotonic() - _STARTED_AT, 2),
         model_loaded=detector.is_ready,
         model=detector.info(),
+        persistence=persistence,
     )
 
 

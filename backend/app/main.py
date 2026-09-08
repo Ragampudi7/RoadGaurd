@@ -10,6 +10,7 @@ request. Nothing is loaded per-request.
 
 from __future__ import annotations
 
+import socket
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -72,8 +73,32 @@ async def lifespan(app: FastAPI):
                     "python3 -c \"import secrets; print(secrets.token_urlsafe(48))\""
                 )
         init_engine(settings)
-        await create_all()
-        logger.info("Persistence enabled")
+        try:
+            await create_all()
+            logger.info("Persistence enabled")
+        except Exception as exc:
+            # A database that is configured but unreachable must not take the
+            # whole API down with it. Detection needs no database at all, and
+            # killing the process means a transient outage - a DNS blip, an
+            # expired trial, a paused instance - costs every feature rather
+            # than the ones that actually depend on it. The auth and report
+            # endpoints already answer 503 through DatabaseUnavailableError
+            # when the engine is absent, so degrading is honest: /analyze
+            # keeps working and nothing pretends to have saved anything.
+            await dispose_engine()
+            logger.error(
+                "DATABASE UNAVAILABLE - starting without persistence. Accounts "
+                "and saved reports will answer 503 until this is fixed; "
+                "/analyze is unaffected. Cause: %s: %s",
+                type(exc).__name__, exc,
+            )
+            if isinstance(exc, socket.gaierror):
+                logger.error(
+                    "The database hostname did not resolve. Either this machine "
+                    "has no DNS right now, or the database no longer exists "
+                    "(a deleted or expired instance loses its hostname). Check "
+                    "DATABASE_URL and that the service is still running."
+                )
     else:
         logger.info("DATABASE_URL not set - reports will not be persisted")
 

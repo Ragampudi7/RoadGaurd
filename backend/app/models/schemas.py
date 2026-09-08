@@ -187,6 +187,15 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
     model_loaded: bool
     model: ModelInfo
+    persistence: str = Field(
+        default="disabled",
+        description=(
+            "'enabled' = accounts and saved reports work; 'unavailable' = a "
+            "database is configured but could not be reached, so those "
+            "endpoints answer 503 while /analyze is unaffected; 'disabled' = "
+            "no DATABASE_URL, which is a valid single-visit configuration"
+        ),
+    )
 
 
 class AnalyzeResponse(BaseModel):

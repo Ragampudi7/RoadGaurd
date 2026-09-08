@@ -60,6 +60,18 @@ def wants_tls(raw_url: str) -> bool:
     return "sslmode=require" in low or "ssl=true" in low or "aivencloud.com" in low
 
 
+def engine_ready() -> bool:
+    """
+    True when a live engine exists.
+
+    Distinct from ``database_enabled``, which only says a DATABASE_URL was
+    configured. Start-up disposes the engine when the database cannot be
+    reached, so this is what tells "asked for and working" apart from "asked
+    for and unreachable".
+    """
+    return _engine is not None
+
+
 def database_enabled(settings) -> bool:
     return bool(getattr(settings, "database_url", None))
 
