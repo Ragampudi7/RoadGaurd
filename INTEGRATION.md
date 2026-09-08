@@ -7,6 +7,12 @@ plug into the same backend, and neither needs to modify it.
 Read the half you need. What each side must hand over is listed at the end of
 its section, and it is short.
 
+**Handing this to a teammate?** Send them the one-page brief for their half
+instead — same requirements, none of the other side's detail:
+
+- [`docs/requirements-model.md`](docs/requirements-model.md)
+- [`docs/requirements-frontend.md`](docs/requirements-frontend.md)
+
 ---
 
 # Part 1 — Bringing your own model
