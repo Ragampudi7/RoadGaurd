@@ -116,6 +116,16 @@ and both hid real bugs.
 
 ---
 
+## Bringing your own model or frontend
+
+**[`INTEGRATION.md`](INTEGRATION.md)** is the contract for both, and what to
+ask for before accepting either. The short version: a model must be an
+Ultralytics **detection** checkpoint whose class *names* are meaningful,
+because the hazard weights and the recommended remediation are matched on the
+name, not the index. A frontend needs only `/docs`, its origin in
+`EXTRA_CORS_ORIGINS`, and the discipline to render the PDF the API returns
+rather than building its own.
+
 ## Deploying
 
 Each service has its own `Dockerfile`, so the build is identical wherever it
