@@ -161,12 +161,17 @@ export async function analyze({ file, latitude, longitude, includeImage = true, 
 
 export const getHealth = () => request("/health", { auth: false });
 
-/** base64 payload -> blob URL for <img src> or a download link. */
-export function b64ToUrl(b64, mime) {
+/** base64 payload -> Blob. The API returns media inside JSON this way. */
+export function b64ToBlob(b64, mime) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  return new Blob([bytes], { type: mime });
+}
+
+/** base64 payload -> blob URL for <img src> or a download link. */
+export function b64ToUrl(b64, mime) {
+  return URL.createObjectURL(b64ToBlob(b64, mime));
 }
 
 export { ApiError };

@@ -5,6 +5,7 @@ import { useReports } from "../../context/ReportsContext";
 import { ScoreGauge, RiskPanel, DetectionTable } from "../../components/Results";
 import DemoBadge from "../../components/DemoBadge";
 import { generateReportPdf } from "../../lib/reportPdf";
+import { b64ToBlob, downloadBlob } from "../../lib/api";
 import { useState } from "react";
 
 export default function DetectionResult() {
@@ -23,6 +24,30 @@ export default function DetectionResult() {
         <Link to="/app/upload" className="btn btn-primary">Upload a photograph</Link>
       </div>
     );
+  }
+
+  /**
+   * Hand over the report the BACKEND built.
+   *
+   * /analyze already returns a full ReportLab document in `result.report` -
+   * the score gauge, the risk meter with its weighted components, the
+   * geospatial and jurisdiction panels, the per-defect inventory table and
+   * the annotated evidence image. Calling generateReportPdf() instead threw
+   * all of that away and printed the screen through the browser's print
+   * dialog, which is why the output carried "about:blank" and a page counter
+   * in its margins and none of the analysis.
+   *
+   * Mock mode has no server, so `report` is null there and the print window
+   * is the only thing available - and what it produces is demo data anyway.
+   */
+  function downloadReport() {
+    const payload = result.report;
+    if (payload?.data) {
+      downloadBlob(b64ToBlob(payload.data, payload.mime_type || "application/pdf"),
+                   payload.filename || `road_health_report_${result.request_id}.pdf`);
+      return;
+    }
+    generateReportPdf(result, { demo: isMock || result.is_demo, imageUrl });
   }
 
   async function onSave(submit) {
@@ -56,7 +81,7 @@ export default function DetectionResult() {
             <Send size={15} /> File now
           </button>
           <button className="btn btn-primary"
-                  onClick={() => generateReportPdf(result, { demo: isMock || result.is_demo, imageUrl })}>
+                  onClick={downloadReport}>
             <FileDown size={15} /> Export PDF
           </button>
         </div>
