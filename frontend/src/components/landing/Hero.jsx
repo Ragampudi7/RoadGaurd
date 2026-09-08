@@ -62,7 +62,10 @@ export default function Hero() {
           <motion.div
             initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: .6, delay: .45 }}
-            className="glass absolute -bottom-7 -left-3 w-52 p-4 sm:-left-10"
+            // Hangs below the photo but stays inside its horizontal bounds. The
+            // previous -left-10 pushed it 40px into the left grid column, where
+            // it sat on top of the paragraph text at every width above `sm`.
+            className="glass absolute -bottom-6 left-4 w-52 p-4 sm:left-6"
             style={{ background: "rgb(14 18 24 / 0.86)" }}>
             <div className="text-[11px] uppercase tracking-wider text-[color:var(--color-muted)]">Road health</div>
             <div className="mt-1 flex items-end gap-2">

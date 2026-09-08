@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UploadCloud, MapPin, Loader2, X } from "lucide-react";
+import { UploadCloud, MapPin, Loader2, X, Camera } from "lucide-react";
 import { useDetection } from "../../context/DetectionContext";
+import CameraCapture from "../../components/CameraCapture";
 import DemoBadge from "../../components/DemoBadge";
 
 export default function Upload() {
@@ -10,6 +11,7 @@ export default function Upload() {
   const [lon, setLon] = useState("");
   const [geoNote, setGeoNote] = useState("");
   const [drag, setDrag] = useState(false);
+  const [camera, setCamera] = useState(false);
   const nav = useNavigate();
 
   function locate() {
@@ -41,6 +43,9 @@ export default function Upload() {
 
   return (
     <div className="grid gap-5">
+      {camera && (
+        <CameraCapture onCapture={setImage} onClose={() => setCamera(false)} />
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Upload a road photograph</h1>
         {isMock && <DemoBadge />}
@@ -77,12 +82,22 @@ export default function Upload() {
           </label>
           <input id="photo" type="file" hidden accept="image/jpeg,image/png,image/webp,image/bmp"
                  onChange={(e) => setImage(e.target.files?.[0])} />
-          {file && (
-            <button type="button" onClick={() => setImage(null)}
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-[color:var(--color-muted)] hover:text-[color:var(--color-danger)] cursor-pointer">
-              <X size={13} /> Remove
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" className="btn btn-ghost !py-2 !text-[13px]"
+                    onClick={() => setCamera(true)}>
+              <Camera size={15} /> Take a photo
             </button>
-          )}
+            <label htmlFor="photo" className="btn btn-ghost !py-2 !text-[13px] cursor-pointer">
+              <UploadCloud size={15} /> Choose a file
+            </label>
+            {file && (
+              <button type="button" onClick={() => setImage(null)}
+                      className="inline-flex items-center gap-1 text-xs text-[color:var(--color-muted)] hover:text-[color:var(--color-danger)] cursor-pointer">
+                <X size={13} /> Remove
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
