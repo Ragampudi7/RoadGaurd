@@ -160,6 +160,18 @@ async def dispose_engine() -> None:
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     if _sessionmaker is None:
+        # Two very different reasons land here, and telling someone the
+        # database "is not configured" when it is configured and simply
+        # unreachable sends them to edit a file that is already correct.
+        from app.config import get_settings
+
+        if database_enabled(get_settings()):
+            raise DatabaseUnavailableError(
+                "The database is configured but could not be reached when this "
+                "server started, so accounts and saved reports are unavailable. "
+                "Analysis and PDF export still work. The server log records the "
+                "reason - restart the server once the database is reachable."
+            )
         raise DatabaseUnavailableError()
     async with _sessionmaker() as session:
         try:
