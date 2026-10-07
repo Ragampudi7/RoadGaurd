@@ -1,0 +1,79 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #05070d;
+  color: #e8ecf4;
+  font-family: "Inter", sans-serif;
+}
+
+::selection {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.leaflet-container {
+  background: #0e1525;
+  font-family: "Inter", sans-serif;
+}
+
+.leaflet-control-attribution {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.text-gradient {
+  background: linear-gradient(180deg, #ffffff 0%, #9db4e8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stat-card {
+  background: rgba(14, 21, 37, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid #1c2333;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.stat-card .label {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stat-card .sub {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+/* Form inputs stay readable on dark panels */
+.input-dark {
+  @apply w-full rounded-xl border border-line bg-panel2 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-signal;
+}
