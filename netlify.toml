@@ -1,34 +1,28 @@
 # Netlify hosts the frontend. It cannot host the API: there is no persistent
 # Python process, and Netlify Functions cap at 250 MB unzipped while PyTorch
-# alone is larger than that. So this deployment serves the interface, and
-# VITE_USE_MOCK decides what fills it.
+# alone is larger than that. So this deployment serves the interface only, and
+# needs the API running elsewhere (Render - see render.yaml).
 
 [build]
   # No `base` key on purpose. When base is set, Netlify resolves `publish`
-  # relative to it, and `base = "frontend"` with `publish = "frontend/dist"`
-  # quietly becomes frontend/frontend/dist - a deploy that succeeds and
+  # relative to it, and `base = "frontend-v2"` with `publish = "frontend-v2/dist"`
+  # quietly becomes frontend-v2/frontend-v2/dist - a deploy that succeeds and
   # publishes nothing. Running from the repo root removes the ambiguity.
-  command = "cd frontend && npm ci && npm run build"
-  publish = "frontend/dist"
+  command = "cd frontend-v2 && npm ci && npm run build"
+  publish = "frontend-v2/dist"
 
 [build.environment]
-  # Vite 8 needs Node 20+.
   NODE_VERSION = "22"
 
-  # DEMO MODE. Every figure on this deployment comes from
-  # frontend/src/lib/mockData.js, not from the model, and the UI says so on
-  # every screen that shows a number.
+  # frontend-v2 has NO demo mode - every figure comes from the API. Before the
+  # first deploy set, in Netlify's UI (Site configuration -> Environment
+  # variables):
   #
-  # To serve real analyses instead, set both of these in Netlify's UI
-  # (Site configuration -> Environment variables) and redeploy:
+  #     VITE_API_BASE = your-api-host.onrender.com
   #
-  #     VITE_USE_MOCK = false
-  #     VITE_API_BASE = your-api-host.example.com
-  #
-  # A redeploy, not a restart: Vite compiles these into the bundle at build
-  # time. And the API must allow this site's origin - set FRONTEND_URL on the
-  # backend to the Netlify domain, or every request fails on CORS.
-  VITE_USE_MOCK = "true"
+  # It is compiled into the bundle at build time, so changing it needs a
+  # redeploy. The API must also allow this site's origin: add the Netlify
+  # domain to EXTRA_CORS_ORIGINS on the backend, or every request fails on CORS.
 
 # BrowserRouter serves every route from index.html. Without this, a visitor
 # who refreshes on /app/reports asks the CDN for a file that was never built

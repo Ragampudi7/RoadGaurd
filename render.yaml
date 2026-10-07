@@ -109,7 +109,9 @@ services:
   - type: web
     name: roadguard-ui
     runtime: static
-    rootDir: frontend
+    # frontend-v2 is the live UI; the original frontend/ is kept in the repo
+    # for reference but is not deployed.
+    rootDir: frontend-v2
     # npm ci needs the committed package-lock.json and is reproducible;
     # npm install is not.
     buildCommand: "npm ci && npm run build"
@@ -134,6 +136,7 @@ services:
           type: web
           name: roadguard-api
           property: host
-      # The demo data is for running without a backend. This deployment has one.
-      - key: VITE_USE_MOCK
-        value: "false"
+      # frontend-v2 has no demo mode: every figure comes from this API.
+      # Vite 5 needs Node 18+; pin it so a Render default change cannot break the build.
+      - key: NODE_VERSION
+        value: "22"
