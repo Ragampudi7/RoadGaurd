@@ -13,6 +13,7 @@ VITE_USE_MOCK=false and served on 127.0.0.1:5173.
 """
 
 import json
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -23,7 +24,7 @@ from playwright.sync_api import sync_playwright
 
 API = "http://127.0.0.1:8000"
 APP = "http://127.0.0.1:5173"
-IMG = "/home/claude/training/datasets/pothole/test/images/11_jpg.rf.7ef3d543d83c0f883b9145bb22c860a5.jpg"
+IMG = str(Path(__file__).resolve().parents[1] / "datasets/pothole/test/images/11_jpg.rf.7ef3d543d83c0f883b9145bb22c860a5.jpg")
 CH = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
 
 EMAIL = f"e2e{int(time.time())}@example.com"

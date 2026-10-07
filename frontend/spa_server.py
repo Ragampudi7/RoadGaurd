@@ -1,7 +1,7 @@
 """Static server for dist/ with SPA fallback, so deep links like /app/reports work."""
 import http.server, os, socketserver
 
-ROOT = "/home/claude/frontend/dist"
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
 
 
 class SPA(http.server.SimpleHTTPRequestHandler):

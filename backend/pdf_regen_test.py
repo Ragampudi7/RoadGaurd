@@ -2,6 +2,8 @@
 import hashlib
 import io
 import os
+import tempfile
+from pathlib import Path
 import uuid
 
 os.environ.setdefault("DATABASE_URL", "postgresql://postgres@127.0.0.1:5433/roadguard")
@@ -26,7 +28,8 @@ def check(label, cond, extra=""):
         print(f"  FAIL  {label} {extra}")
 
 
-IMG_PATH = "/home/claude/training/datasets/pothole/test/images/11_jpg.rf.7ef3d543d83c0f883b9145bb22c860a5.jpg"
+REPO = Path(__file__).resolve().parents[1]
+IMG_PATH = str(REPO / "datasets/pothole/test/images/11_jpg.rf.7ef3d543d83c0f883b9145bb22c860a5.jpg")
 photo = open(IMG_PATH, "rb").read()
 digest = hashlib.sha256(photo).hexdigest()
 w, h = Image.open(io.BytesIO(photo)).size
@@ -86,7 +89,7 @@ with TestClient(app) as c:
           r.headers.get("content-disposition"))
     check("not cached", r.headers.get("cache-control") == "no-store")
 
-    open("/home/claude/regen.pdf", "wb").write(body)
+    open(os.path.join(tempfile.gettempdir(), "regen.pdf"), "wb").write(body)
 
     # The document must say it is a rebuild, and name the weights it was filed
     # under rather than whatever this process happens to have loaded.

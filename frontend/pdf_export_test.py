@@ -1,10 +1,11 @@
 """The Export PDF button must hand over the BACKEND's report, not a print-out."""
-import io, sys, time
+import io, os, sys, tempfile, time
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 from pypdf import PdfReader
 
 APP = "http://127.0.0.1:5173"
-IMG = "/home/claude/training/datasets/pothole/test/images/11_jpg.rf.7ef3d543d83c0f883b9145bb22c860a5.jpg"
+IMG = str(Path(__file__).resolve().parents[1] / "datasets/pothole/test/images/11_jpg.rf.7ef3d543d83c0f883b9145bb22c860a5.jpg")
 CH = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
 ok = fail = 0
 def check(l, c, x=""):
@@ -63,7 +64,7 @@ with sync_playwright() as p:
 
     check("more than one page", len(reader.pages) >= 3, f"{len(reader.pages)} pages")
     check("no page errors", not errs, str(errs[:2]))
-    open("/home/claude/export_from_ui.pdf", "wb").write(data)
+    open(os.path.join(tempfile.gettempdir(), "export_from_ui.pdf"), "wb").write(data)
     b.close()
 
 print(f"\n{ok} passed, {fail} failed")

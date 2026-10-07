@@ -13,9 +13,9 @@ datasets/
 *.tgz
 runs/
 
-# Scratch from assistant sessions. One current sample report is kept in docs/;
-# the rest are intermediate renders of formats that no longer exist.
-Claude outputs/
+# Local scratch folders (e.g. "<name> outputs/") - intermediate renders and
+# archives. One current sample report is kept in docs/.
+/* outputs/
 
 # Local run logs (run_local.command)
 .run_logs/
