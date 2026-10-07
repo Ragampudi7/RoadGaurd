@@ -86,6 +86,30 @@ than cracks, and recall on cracks (0.658) is the weakest number - thin or distan
 cracks are still missed. Good enough to drive a triage tool; not a substitute for
 inspection, and no claim of field accuracy should be made from it.
 
+#### Candidate model evaluated and not adopted (2026-10-07)
+
+A second YOLO11n checkpoint (`roadguard_ai.ipynb`, 50 epochs, 640 px, Colab
+T4; SHA-256 `9d9aed92…`) was scored against these weights on the **same 314
+held-out test images**, same settings. Its card quoted validation numbers
+(mAP50 0.828); validation is what training selected against, so only the test
+split is comparable. The harness reproduces this model's published figures
+exactly, so the comparison is like for like.
+
+| test split, mAP50 | current (`yolo11n-935e809b`) | candidate |
+|---|---|---|
+| **overall** | **0.796** | 0.704 |
+| pothole | **0.878** | 0.675 |
+| crack | 0.714 | **0.734** |
+| pothole dataset only (131 images) | **0.950** | 0.627 |
+| road dataset only (183 images) | **0.748** | 0.743 |
+
+Overall mAP50-95 0.503 vs 0.378; precision 0.847 vs 0.774; recall 0.719 vs
+0.634. The candidate was trained on the road dataset alone and never saw the
+pothole dataset, so it trails badly on potholes - the defect this tool exists
+to report - and is roughly level on the data it did see. Kept the current
+weights. Retraining the candidate's recipe on the merged dataset (both
+sources, remapped as in `train_yolo11_colab.ipynb`) is the fair next test.
+
 Serving resolution must match training. `INFERENCE_IMAGE_SIZE` is 640 for these
 weights; changing one without the other costs accuracy silently.
 
