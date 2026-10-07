@@ -36,8 +36,14 @@ def _as_origin(value: str) -> str:
     if not item or item == "*" or "://" in item:
         return item
     host = item.split(":", 1)[0]
-    scheme = "http" if host in {"localhost", "127.0.0.1", "0.0.0.0"} else "https"
-    return f"{scheme}://{item}"
+    if host in {"localhost", "127.0.0.1", "0.0.0.0"}:
+        return f"http://{item}"
+    # Render's `host` property is the service's short private-network name
+    # ("roadguard-ui-80bw"), not its public hostname. A browser never sends
+    # that as an Origin; the public form is the same name under onrender.com.
+    if "." not in host:
+        item = f"{item}.onrender.com"
+    return f"https://{item}"
 
 
 # ---------------------------------------------------------------------------

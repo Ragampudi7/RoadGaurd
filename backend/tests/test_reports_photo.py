@@ -170,6 +170,8 @@ def test_pretrained_fallback_is_labelled_as_such(tmp_path):
     [
         # What Render's blueprint actually passes: a bare hostname.
         ("roadguard-ui.onrender.com", "https://roadguard-ui.onrender.com"),
+        # What Render's `host` property really is: the short service name.
+        ("roadguard-ui-80bw", "https://roadguard-ui-80bw.onrender.com"),
         ("https://roadguard-ui.onrender.com/", "https://roadguard-ui.onrender.com"),
         ("http://localhost:5173", "http://localhost:5173"),
         ("localhost:5173", "http://localhost:5173"),

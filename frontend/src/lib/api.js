@@ -16,7 +16,14 @@ const RAW_BASE = (import.meta.env.VITE_API_BASE || "http://localhost:8000")
   .trim()
   .replace(/\/+$/, "");
 
-export const API_BASE = /^https?:\/\//i.test(RAW_BASE) ? RAW_BASE : `https://${RAW_BASE}`;
+// Render's `host` property is the short private-network service name
+// ("roadguard-api-f019"), which a browser cannot resolve; the public address
+// is the same name under onrender.com.
+const WITH_DOMAIN = /^https?:\/\//i.test(RAW_BASE) || /^[^/:]+\./.test(RAW_BASE) || /^localhost(:|$)/i.test(RAW_BASE)
+  ? RAW_BASE
+  : RAW_BASE.replace(/^([^/:]+)/, "$1.onrender.com");
+
+export const API_BASE = /^https?:\/\//i.test(WITH_DOMAIN) ? WITH_DOMAIN : `https://${WITH_DOMAIN}`;
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
 
