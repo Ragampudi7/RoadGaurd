@@ -152,6 +152,13 @@ export async function analyze({ file, latitude, longitude, locationSource, inclu
 
 export const getHealth = () => request("/health", { auth: false });
 
+/**
+ * Place name for a point, looked up by the backend from OpenStreetMap (cached
+ * and rate-limited there). `label` is null when no name is available.
+ */
+export const reverseGeocode = (lat, lng, { signal } = {}) =>
+  request(`/geocode/reverse?latitude=${lat.toFixed(6)}&longitude=${lng.toFixed(6)}`, { auth: false, signal });
+
 /* ---------------------------------------------------------------- helpers -- */
 /** base64 payload -> Blob. The API returns media inside JSON this way. */
 export function b64ToBlob(b64, mime) {

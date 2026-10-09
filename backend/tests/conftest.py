@@ -10,6 +10,11 @@ pipeline - validation, scoring, annotation and PDF generation.
 from __future__ import annotations
 
 import io
+import os
+
+# Tests never call OpenStreetMap. Geocoding tests switch it on against a local
+# stand-in server instead.
+os.environ.setdefault("GEOCODING_ENABLED", "false")
 from typing import Any, Dict, List
 
 import pytest

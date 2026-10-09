@@ -69,6 +69,7 @@ def run_assessment(
     detector = detector or get_detector()
     location = location or {"source": None, "source_label": "Not recorded",
                             "photo_taken_at": None, "warning": None}
+    address = location.get("address") or {}
 
     started = time.perf_counter()
     moment = _now(settings)
@@ -107,6 +108,7 @@ def run_assessment(
         defect_percentage=scored["defect_percentage"],
         latitude=latitude,
         longitude=longitude,
+        address=address.get("label"),
         authority=settings.municipal_authority,
         is_road_defect_model=is_real_model,
         risk=risk if is_real_model else None,
@@ -164,6 +166,7 @@ def run_assessment(
             "longitude": longitude,
             "maps_url": _maps_url(latitude, longitude),
             "location_source_label": location["source_label"],
+            "address": address.get("label"),
             "sha256": digest,
             "road_health_score": scored["road_health_score"],
             "road_condition": scored["road_condition"],
@@ -233,6 +236,8 @@ def run_assessment(
             source=location["source"],
             source_label=location["source_label"],
             photo_taken_at=location["photo_taken_at"],
+            address=address.get("label"),
+            address_full=address.get("full"),
         ),
         image=ImageInfo(
             filename=display_name,

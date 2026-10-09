@@ -58,6 +58,9 @@ def test_analyze_happy_path(client):
         "source": None,
         "source_label": "Not recorded",
         "photo_taken_at": None,
+        # Geocoding is off in tests: no place name, and no guessed one either.
+        "address": None,
+        "address_full": None,
     }
     assert body["image"]["width"] == 800 and body["image"]["height"] == 600
     assert body["request_id"].startswith("RHA-")

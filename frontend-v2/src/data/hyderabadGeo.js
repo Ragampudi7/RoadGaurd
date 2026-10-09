@@ -76,17 +76,6 @@ export function isInsideTelangana(point) {
   return point.lat >= south && point.lat <= north && point.lng >= west && point.lng <= east;
 }
 
-function distanceSquared(a, b) {
-  return (a.lat - b.lat) ** 2 + (a.lng - b.lng) ** 2;
-}
-
-export function getNearestHyderabadArea(point) {
-  if (!point) return HYDERABAD_AREAS[0].name;
-  return HYDERABAD_AREAS.reduce((nearest, area) =>
-    distanceSquared(point, area) < distanceSquared(point, nearest) ? area : nearest
-  ).name;
-}
-
 export function formatCoordinates(point) {
   if (!point) return "";
   return `${point.lat.toFixed(4)} deg N, ${point.lng.toFixed(4)} deg E`;

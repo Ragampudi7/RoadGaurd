@@ -59,6 +59,8 @@ class ReportCreate(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     location_source: Literal["photo", "device", "map"] | None = None
+    address: str | None = Field(default=None, max_length=300)
+    address_full: str | None = Field(default=None, max_length=600)
 
     road_health_score: float = Field(ge=0, le=100)
     road_condition: str = Field(max_length=20)
@@ -106,6 +108,7 @@ class ReportOut(BaseModel):
     latitude: float
     longitude: float
     location_source: str | None
+    address: str | None
     road_health_score: float
     road_condition: str
     defect_percentage: float
@@ -127,6 +130,7 @@ class ReportOut(BaseModel):
             id=r.id, reference=r.reference, status=r.status, title=r.title,
             latitude=r.latitude, longitude=r.longitude,
             location_source=r.location_source,
+            address=r.address,
             road_health_score=float(r.road_health_score), road_condition=r.road_condition,
             defect_percentage=float(r.defect_percentage), total_defects=r.total_defects,
             defect_counts=r.defect_counts or {},
@@ -143,6 +147,7 @@ class ReportDetail(ReportOut):
     risk_components: list[dict[str, Any]]
     complaint_description: str | None
     addressed_to: str | None
+    address_full: str | None = None
     analysed_at: datetime | None
 
 
@@ -255,7 +260,8 @@ async def create_report(
                         risk_components=report.risk_components or [],
                         complaint_description=report.complaint_description,
                         addressed_to=report.addressed_to,
-                        analysed_at=report.analysed_at)
+                        analysed_at=report.analysed_at,
+                        address_full=report.address_full)
 
 
 @router.get("/reports", response_model=ReportPage)
@@ -334,7 +340,8 @@ async def get_report(
                         risk_components=r.risk_components or [],
                         complaint_description=r.complaint_description,
                         addressed_to=r.addressed_to,
-                        analysed_at=r.analysed_at)
+                        analysed_at=r.analysed_at,
+                        address_full=r.address_full)
 
 
 @router.get("/reports/{report_id}/image")

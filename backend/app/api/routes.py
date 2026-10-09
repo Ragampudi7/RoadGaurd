@@ -26,6 +26,7 @@ from app.models.schemas import (
     HealthResponse,
     RootResponse,
 )
+from app.services import geocode_service
 from app.services.assessment_service import run_assessment
 from app.services.detection_service import get_detector
 from app.utils.errors import ServerBusyError
@@ -126,6 +127,9 @@ async def analyze(
     lat, lon = validate_coordinates(latitude, longitude)
     image_bytes = await read_upload(image, settings)
     location = check_location_source(location_source, lat, lon, image_bytes)
+    # Usually a cache hit: the upload screen looked this point up already.
+    # Done before taking an inference slot so a slow lookup never holds one.
+    location["address"] = await run_in_threadpool(geocode_service.reverse, lat, lon)
 
     try:
         await asyncio.wait_for(_inference_slots.acquire(), timeout=_QUEUE_TIMEOUT_SECONDS)
@@ -149,3 +153,29 @@ async def analyze(
     finally:
         _inference_slots.release()
         await image.close()
+
+
+@router.get(
+    "/geocode/reverse",
+    tags=["assessment"],
+    summary="Place name for a point (OpenStreetMap), for previewing a complaint location",
+)
+async def reverse_geocode(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+) -> dict:
+    """
+    Returns ``{"latitude", "longitude", "label", "full", "source"}``. ``label``
+    is null when no place name is available - the client then shows the
+    coordinates, never a guess. Lookups are cached and rate-limited server-side
+    to respect OpenStreetMap's usage policy.
+    """
+    lat, lon = validate_coordinates(latitude, longitude)
+    found = await run_in_threadpool(geocode_service.reverse, lat, lon)
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "label": found["label"] if found else None,
+        "full": found["full"] if found else None,
+        "source": found["source"] if found else None,
+    }

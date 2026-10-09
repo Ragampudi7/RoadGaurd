@@ -19,13 +19,13 @@ import {
 } from "lucide-react";
 import { useDetection } from "../context/DetectionContext";
 import { useReports } from "../context/ReportsContext";
-import { formatCoordinates, getNearestHyderabadArea, TELANGANA_BOUNDS, TELANGANA_OUTLINE } from "../data/hyderabadGeo";
+import { formatCoordinates, TELANGANA_BOUNDS, TELANGANA_OUTLINE } from "../data/hyderabadGeo";
 import { downloadBlob } from "../lib/api";
 import { conditionColor, damageLabel, pdfName, prettyClass, riskColor } from "../lib/present";
 
-function ResultLocationMap({ gps }) {
+function ResultLocationMap({ gps, address }) {
   if (!gps) return null;
-  const area = getNearestHyderabadArea(gps);
+  const area = address || "Place name unavailable";
 
   return (
     <motion.div
@@ -166,7 +166,7 @@ export default function DetectionResult() {
     {
       icon: MapPin,
       label: "GPS Location",
-      value: getNearestHyderabadArea(point),
+      value: result.location.address || "Place name unavailable",
       sub: [
         formatCoordinates(point),
         `Location from: ${result.location.source_label || "Not recorded"}`,
@@ -348,7 +348,7 @@ export default function DetectionResult() {
         </div>
       )}
 
-      <ResultLocationMap gps={point} />
+      <ResultLocationMap gps={point} address={result.location.address} />
 
       <p className="text-xs leading-relaxed text-ink/45">
         Model {result.model_info?.version || result.model_info?.name}. Scores, severities and risk tiers follow this

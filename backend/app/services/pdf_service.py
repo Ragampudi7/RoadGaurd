@@ -757,6 +757,8 @@ def build_report(ctx: Dict[str, Any]) -> bytes:
                 ("Coordinates", "%.6f\u00b0 %s, %.6f\u00b0 %s"
                  % (abs(ctx["latitude"]), "N" if ctx["latitude"] >= 0 else "S",
                     abs(ctx["longitude"]), "E" if ctx["longitude"] >= 0 else "W")),
+                ("Address", Paragraph(escape(ctx.get("address") or
+                                             "Not available - see coordinates"), style["cap"])),
                 ("Location from", ctx.get("location_source_label") or "Not recorded"),
                 ("Region", ctx["region"]),
                 ("Source image", "%s (%d x %d px)" % (ctx["image_filename"],

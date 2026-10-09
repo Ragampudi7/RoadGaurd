@@ -74,6 +74,11 @@ class Report(Base):
     # How latitude/longitude were obtained: photo | device | map. NULL for
     # reports filed before this was recorded.
     location_source: Mapped[str | None] = mapped_column(String(10))
+    # Place name looked up once at analysis time (OpenStreetMap) and stored, so
+    # lists and rebuilt PDFs never re-query - and an old report keeps the name
+    # it was filed under. NULL when the lookup failed.
+    address: Mapped[str | None] = mapped_column(String(300))
+    address_full: Mapped[str | None] = mapped_column(String(600))
 
     # --- scoring -----------------------------------------------------------
     road_health_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)

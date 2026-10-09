@@ -61,6 +61,8 @@ export function ReportsProvider({ children }) {
       latitude,
       longitude,
       location_source: analysis.location.source ?? null,
+      address: analysis.location.address ?? null,
+      address_full: analysis.location.address_full ?? null,
       road_health_score: analysis.road_health_score,
       road_condition: analysis.road_condition,
       defect_percentage: analysis.defect_percentage,

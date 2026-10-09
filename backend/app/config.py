@@ -248,6 +248,21 @@ class Settings(BaseSettings):
     complaint_region: str = "Hyderabad, Telangana, India"
     report_timezone_offset_minutes: int = 330  # IST (UTC+05:30)
 
+    # -- Place names (reverse geocoding) -----------------------------------
+    # Coordinates -> "Road, Locality, City" via OpenStreetMap Nominatim. The
+    # free service allows ~1 request/second and requires a User-Agent that
+    # identifies the application; results are cached and stored per report.
+    # Set GEOCODING_ENABLED=false to work offline: reports then show
+    # coordinates only, never a guessed area name.
+    geocoding_enabled: bool = True
+    geocoder_url: str = "https://nominatim.openstreetmap.org"
+    geocoder_user_agent: str = (
+        "RoadGuard-AI/1.0 (road-defect grievance student project; "
+        "https://github.com/Ragampudi7/RoadGaurd)"
+    )
+    geocoder_timeout_seconds: float = 5.0
+    geocoder_min_interval_seconds: float = 1.0
+
     # -- Performance ------------------------------------------------------
     # A free Render instance has ~0.1 CPU and 512 MB RAM. Serialising
     # inference protects it from being OOM-killed by concurrent uploads.

@@ -177,6 +177,7 @@ def build_pdf(report: Report, settings: Settings | None = None) -> bytes:
         "longitude": report.longitude,
         "maps_url": _maps_url(report.latitude, report.longitude),
         "location_source_label": source_label(getattr(report, "location_source", None)),
+        "address": getattr(report, "address", None),
         "sha256": report.image_sha256 or "",
         # Everything below is the row, not a fresh computation.
         "road_health_score": float(report.road_health_score),

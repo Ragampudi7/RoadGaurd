@@ -65,6 +65,8 @@ class Location(BaseModel):
     source: Optional[str] = Field(default=None, description="How the coordinates were obtained: photo | device | map")
     source_label: str = Field(default="Not recorded", description="Plain-language form of `source`, as printed on the report")
     photo_taken_at: Optional[str] = Field(default=None, description="Capture time the camera wrote into the photo, if any")
+    address: Optional[str] = Field(default=None, description="Short place name, e.g. 'Snehapuri Colony Main Road, Nagole, Hyderabad' (OpenStreetMap); null if the lookup failed")
+    address_full: Optional[str] = Field(default=None, description="Full OpenStreetMap address for the point, if available")
 
 
 class ImageInfo(BaseModel):

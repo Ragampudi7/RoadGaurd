@@ -17,10 +17,10 @@ import {
 } from "lucide-react";
 import { useDetection } from "../context/DetectionContext";
 import { getDeviceLocation, readPhotoLocation } from "../lib/photoLocation";
+import { usePlaceName } from "../lib/usePlaceName";
 import { useReports } from "../context/ReportsContext";
 import {
   formatCoordinates,
-  getNearestHyderabadArea,
   HYDERABAD_CENTER,
   isInsideTelangana,
   TELANGANA_BOUNDS,
@@ -78,10 +78,10 @@ function PickOnClick({ onPick }) {
   return null;
 }
 
-function ComplaintLocationMap({ gps, compact = false, onPick, needsPin = false }) {
+function ComplaintLocationMap({ gps, compact = false, onPick, needsPin = false, placeName }) {
   const point = gps || DEFAULT_GPS;
   const zoom = gps ? 16 : 12;
-  const area = getNearestHyderabadArea(point);
+  const area = placeName || formatCoordinates(point);
 
   return (
     <div className="overflow-hidden rounded-xl border border-line">
@@ -131,7 +131,7 @@ function ComplaintLocationMap({ gps, compact = false, onPick, needsPin = false }
       </div>
       <div className="bg-panel2 px-4 py-3 text-xs text-ink/60">
         {gps
-          ? `${area} | ${formatCoordinates(gps)} — tap the map to correct the pin`
+          ? `${placeName ? `${placeName} | ` : ""}${formatCoordinates(gps)} — tap the map to correct the pin`
           : needsPin
             ? "Tap the map where the pothole is."
             : "After a photo is selected, this map shows where it was taken."}
@@ -165,6 +165,7 @@ export default function UploadPage() {
   // gpsSource is "photo" | "device" | "map" once a location is set, or one of
   // the "need-pin-*" reasons while the citizen still has to tap the map.
   const [locating, setLocating] = useState(false);
+  const place = usePlaceName(gps);
   const lookupRef = useRef(0); // ignore a slow lookup for a photo since replaced
 
   // A complaint's location is evidence, so it is never guessed: it comes from
@@ -499,7 +500,9 @@ export default function UploadPage() {
                       <div className="flex items-start gap-3 rounded-xl border border-line bg-panel2 px-4 py-3 text-sm text-ink/75">
                         <MapPin className="h-4 w-4 text-signal" />
                         <div>
-                          <p className="font-semibold text-white">{getNearestHyderabadArea(gps)}</p>
+                          <p data-testid="place-name" className="font-semibold text-white">
+                            {place.label || (place.loading ? "Looking up the address..." : "Place name unavailable")}
+                          </p>
                           <p className="text-xs text-ink/55">Latitude {gps.lat.toFixed(4)} | Longitude {gps.lng.toFixed(4)}</p>
                           {LOCATION_NOTE[gpsSource] && (
                             <p data-testid="location-note" className="mt-1 text-xs text-green-300">
@@ -564,6 +567,7 @@ export default function UploadPage() {
           <div className="overflow-hidden rounded-2xl border border-line bg-panel">
             <ComplaintLocationMap gps={gps} compact={!!preview} onPick={preview && !analyzing ? pickOnMap : undefined}
               needsPin={!!preview && !gps && !locating}
+              placeName={place.label}
             />
             <div className="bg-panel p-5">
               <h3 className="font-display text-lg font-semibold text-white">Complaint Location</h3>

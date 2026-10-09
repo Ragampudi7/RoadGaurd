@@ -6,7 +6,7 @@
  * statuses. The screens show those words as-is rather than renaming them, so
  * what a user sees here matches the PDF the backend generates.
  */
-import { formatCoordinates, getNearestHyderabadArea } from "../data/hyderabadGeo";
+import { formatCoordinates } from "../data/hyderabadGeo";
 
 export const RISK_LEVELS = ["Critical", "High", "Moderate", "Low"];
 
@@ -63,8 +63,11 @@ export function fromApi(r) {
     lat: r.latitude,
     lng: r.longitude,
     locationSource: r.location_source,
-    area: getNearestHyderabadArea(point),
-    location: `${getNearestHyderabadArea(point)} | ${formatCoordinates(point)}`,
+    // The place name stored with the report (OpenStreetMap, looked up when it
+    // was analysed). Reports filed before that existed show coordinates.
+    area: r.address || formatCoordinates(point),
+    address: r.address || null,
+    location: r.address ? `${r.address} | ${formatCoordinates(point)}` : formatCoordinates(point),
     score: r.road_health_score,
     condition: r.road_condition,
     riskIndex: r.risk_index,

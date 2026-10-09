@@ -26,7 +26,7 @@ required.
 from __future__ import annotations
 
 from bisect import bisect_left
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -174,6 +174,7 @@ def build_complaint_description(
     authority: str,
     is_road_defect_model: bool = True,
     risk: Any = None,
+    address: Optional[str] = None,
 ) -> str:
     """
     Compose the grievance paragraph used in the PDF and the API response.
@@ -190,13 +191,18 @@ def build_complaint_description(
             "grievance."
         )
 
+    # "at Snehapuri Colony Main Road, Nagole, Hyderabad (latitude .., longitude ..)"
+    # when the place name is known; coordinates alone otherwise.
+    where = ("%s (latitude %.6f, longitude %.6f)" % (address, latitude, longitude)
+             if address else "latitude %.6f, longitude %.6f" % (latitude, longitude))
+
     if total_defects == 0:
         return (
-            "An automated assessment of the road surface at latitude %.6f, longitude "
-            "%.6f did not detect any surface defects in the submitted photograph. The "
-            "computed Road Health Score is %.2f out of 100, indicating a %s condition. "
-            "No repair action is requested at this location at present."
-            % (latitude, longitude, score, condition.upper())
+            "An automated assessment of the road surface at %s did not detect any "
+            "surface defects in the submitted photograph. The computed Road Health "
+            "Score is %.2f out of 100, indicating a %s condition. No repair action is "
+            "requested at this location at present."
+            % (where, score, condition.upper())
         )
 
     if defect_counts:
@@ -222,14 +228,13 @@ def build_complaint_description(
         )
 
     return (
-        "Road surface defects were detected in a photograph captured at latitude "
-        "%.6f, longitude %.6f. Automated analysis identified %s, covering approximately "
+        "Road surface defects were detected in a photograph captured at %s. "
+        "Automated analysis identified %s, covering approximately "
         "%.2f%% of the photographed road surface. The computed Road Health Score is "
         "%.2f out of 100, indicating a %s road condition.%s The %s is kindly requested "
         "to inspect the location and undertake the necessary repair work."
         % (
-            latitude,
-            longitude,
+            where,
             summary,
             defect_percentage,
             score,
