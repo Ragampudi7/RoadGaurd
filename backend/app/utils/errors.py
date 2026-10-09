@@ -92,6 +92,12 @@ class InvalidCoordinateError(AppError):
 # --- Server-side failures (5xx) -------------------------------------------
 
 
+class LocationSourceError(AppError):
+    """The coordinates were declared to come from the photo, but the photo disagrees."""
+    status_code = 422
+    error_code = "location_source_invalid"
+
+
 class ModelUnavailableError(AppError):
     status_code = 503
     error_code = "model_unavailable"

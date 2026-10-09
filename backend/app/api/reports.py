@@ -58,6 +58,7 @@ class ReportCreate(BaseModel):
     title: str | None = Field(default=None, max_length=240)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+    location_source: Literal["photo", "device", "map"] | None = None
 
     road_health_score: float = Field(ge=0, le=100)
     road_condition: str = Field(max_length=20)
@@ -104,6 +105,7 @@ class ReportOut(BaseModel):
     title: str | None
     latitude: float
     longitude: float
+    location_source: str | None
     road_health_score: float
     road_condition: str
     defect_percentage: float
@@ -124,6 +126,7 @@ class ReportOut(BaseModel):
         return cls(
             id=r.id, reference=r.reference, status=r.status, title=r.title,
             latitude=r.latitude, longitude=r.longitude,
+            location_source=r.location_source,
             road_health_score=float(r.road_health_score), road_condition=r.road_condition,
             defect_percentage=float(r.defect_percentage), total_defects=r.total_defects,
             defect_counts=r.defect_counts or {},

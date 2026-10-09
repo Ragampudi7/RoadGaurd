@@ -71,6 +71,9 @@ class Report(Base):
 
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    # How latitude/longitude were obtained: photo | device | map. NULL for
+    # reports filed before this was recorded.
+    location_source: Mapped[str | None] = mapped_column(String(10))
 
     # --- scoring -----------------------------------------------------------
     road_health_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)

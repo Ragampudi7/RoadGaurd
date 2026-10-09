@@ -36,6 +36,7 @@ from app.db.models import Report
 from app.models.schemas import Detection, RiskAssessment, RiskComponent
 from app.services import image_service, pdf_service, risk_service, scoring_service
 from app.utils.errors import ReportGenerationError, ReportNotRenderableError
+from app.utils.geotag import source_label
 from app.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -175,6 +176,7 @@ def build_pdf(report: Report, settings: Settings | None = None) -> bytes:
         "latitude": report.latitude,
         "longitude": report.longitude,
         "maps_url": _maps_url(report.latitude, report.longitude),
+        "location_source_label": source_label(getattr(report, "location_source", None)),
         "sha256": report.image_sha256 or "",
         # Everything below is the row, not a fresh computation.
         "road_health_score": float(report.road_health_score),

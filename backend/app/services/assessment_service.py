@@ -58,6 +58,7 @@ def run_assessment(
     filename: Optional[str],
     latitude: float,
     longitude: float,
+    location: Optional[Dict[str, Any]] = None,
     settings: Optional[Settings] = None,
     detector: Optional[RoadDefectDetector] = None,
     include_annotated_image: bool = True,
@@ -66,6 +67,8 @@ def run_assessment(
     """Run the complete assessment and return the API response model."""
     settings = settings or get_settings()
     detector = detector or get_detector()
+    location = location or {"source": None, "source_label": "Not recorded",
+                            "photo_taken_at": None, "warning": None}
 
     started = time.perf_counter()
     moment = _now(settings)
@@ -160,6 +163,7 @@ def run_assessment(
             "latitude": latitude,
             "longitude": longitude,
             "maps_url": _maps_url(latitude, longitude),
+            "location_source_label": location["source_label"],
             "sha256": digest,
             "road_health_score": scored["road_health_score"],
             "road_condition": scored["road_condition"],
@@ -198,6 +202,8 @@ def run_assessment(
         )
 
     warnings = list(detector.warnings())
+    if location.get("warning"):
+        warnings.append(location["warning"])
     if breakdown.overlap_detected and breakdown.method == "sum":
         warnings.append(
             "Some bounding boxes overlap. Following the project specification the box "
@@ -224,6 +230,9 @@ def run_assessment(
             latitude=latitude,
             longitude=longitude,
             maps_url=_maps_url(latitude, longitude),
+            source=location["source"],
+            source_label=location["source_label"],
+            photo_taken_at=location["photo_taken_at"],
         ),
         image=ImageInfo(
             filename=display_name,

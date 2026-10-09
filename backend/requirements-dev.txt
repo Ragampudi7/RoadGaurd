@@ -3,3 +3,4 @@
 
 pytest>=8.3.0,<9.0.0
 httpx>=0.27.0,<0.29.0     # FastAPI's TestClient transport
+pypdf>=4.0                # reading generated PDFs in tests

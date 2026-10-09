@@ -54,6 +54,10 @@ def test_analyze_happy_path(client):
         "latitude": 17.4948,
         "longitude": 78.3996,
         "maps_url": "https://www.google.com/maps/search/?api=1&query=17.494800,78.399600",
+        # No source declared and no GPS in the synthetic image.
+        "source": None,
+        "source_label": "Not recorded",
+        "photo_taken_at": None,
     }
     assert body["image"]["width"] == 800 and body["image"]["height"] == 600
     assert body["request_id"].startswith("RHA-")

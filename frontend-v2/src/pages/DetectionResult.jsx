@@ -167,7 +167,13 @@ export default function DetectionResult() {
       icon: MapPin,
       label: "GPS Location",
       value: getNearestHyderabadArea(point),
-      sub: `${formatCoordinates(point)} | ${new Date(result.analysed_at).toLocaleString()}`,
+      sub: [
+        formatCoordinates(point),
+        `Location from: ${result.location.source_label || "Not recorded"}`,
+        result.location.photo_taken_at
+          ? `Photo taken ${result.location.photo_taken_at.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$3-$2-$1")}`
+          : `Analysed ${new Date(result.analysed_at).toLocaleString()}`,
+      ].join(" | "),
       color: "text-ink",
     },
   ];

@@ -29,6 +29,7 @@ from app.models.schemas import (
 from app.services.assessment_service import run_assessment
 from app.services.detection_service import get_detector
 from app.utils.errors import ServerBusyError
+from app.utils.geotag import check_location_source
 from app.utils.logging_config import get_logger
 from app.utils.validation import read_upload, validate_coordinates, validate_declared_type
 
@@ -102,6 +103,11 @@ async def analyze(
     image: UploadFile = File(..., description="Road photograph (JPG, PNG, WEBP or BMP)"),
     latitude: float = Form(..., description="GPS latitude, -90 to 90"),
     longitude: float = Form(..., description="GPS longitude, -180 to 180"),
+    location_source: Optional[str] = Form(
+        None,
+        description="How the coordinates were obtained: 'photo' (the GPS embedded in this image - "
+                    "verified here), 'device' (live GPS at in-app capture) or 'map' (pinned by hand)",
+    ),
     include_image: bool = Query(True, description="Include the base64 annotated JPEG in the response"),
     include_pdf: bool = Query(True, description="Include the base64 PDF report in the response"),
 ) -> AnalyzeResponse:
@@ -119,6 +125,7 @@ async def analyze(
     validate_declared_type(image.filename, image.content_type)
     lat, lon = validate_coordinates(latitude, longitude)
     image_bytes = await read_upload(image, settings)
+    location = check_location_source(location_source, lat, lon, image_bytes)
 
     try:
         await asyncio.wait_for(_inference_slots.acquire(), timeout=_QUEUE_TIMEOUT_SECONDS)
@@ -134,6 +141,7 @@ async def analyze(
             filename=image.filename,
             latitude=lat,
             longitude=lon,
+            location=location,
             settings=settings,
             include_annotated_image=include_image,
             include_report=include_pdf,

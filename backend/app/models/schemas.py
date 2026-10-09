@@ -62,6 +62,9 @@ class Location(BaseModel):
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
     maps_url: str = Field(..., description="Ready-to-open Google Maps link for the coordinates")
+    source: Optional[str] = Field(default=None, description="How the coordinates were obtained: photo | device | map")
+    source_label: str = Field(default="Not recorded", description="Plain-language form of `source`, as printed on the report")
+    photo_taken_at: Optional[str] = Field(default=None, description="Capture time the camera wrote into the photo, if any")
 
 
 class ImageInfo(BaseModel):

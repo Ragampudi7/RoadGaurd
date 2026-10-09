@@ -62,6 +62,7 @@ export function fromApi(r) {
     title: r.title,
     lat: r.latitude,
     lng: r.longitude,
+    locationSource: r.location_source,
     area: getNearestHyderabadArea(point),
     location: `${getNearestHyderabadArea(point)} | ${formatCoordinates(point)}`,
     score: r.road_health_score,

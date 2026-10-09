@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useDetection } from "../context/DetectionContext";
+import { getDeviceLocation, readPhotoLocation } from "../lib/photoLocation";
 import { useReports } from "../context/ReportsContext";
 import {
   formatCoordinates,
@@ -38,11 +39,24 @@ const DEFAULT_GPS = HYDERABAD_CENTER;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/bmp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 
-const GPS_NOTE = {
-  device: null,
-  map: "Location set on the map.",
-  fallback: "Device location unavailable — pinned to Hyderabad city centre. Tap the map to set the real spot.",
-  outside: "Device location is outside Telangana — pinned to Hyderabad city centre. Tap the map to set the real spot.",
+// What the citizen is told about where the location came from, or why they
+// must tap the map. `tone` picks the colour.
+const LOCATION_NOTE = {
+  photo: { tone: "ok", text: "Location read from the photo itself." },
+  device: { tone: "ok", text: "Location from your phone's GPS, taken just now." },
+  map: { tone: "ok", text: "Location set on the map." },
+  "need-pin-upload": {
+    tone: "warn",
+    text: "This photo has no location saved in it (common for WhatsApp images and screenshots). Tap the map where the pothole is.",
+  },
+  "need-pin-camera": {
+    tone: "warn",
+    text: "Couldn't get your phone's location. Allow location access, or tap the map where the pothole is.",
+  },
+  "need-pin-outside": {
+    tone: "warn",
+    text: "This location is outside Telangana, which this service covers. Tap the map where the pothole is.",
+  },
 };
 
 function RecenterMap({ point, zoom }) {
@@ -64,7 +78,7 @@ function PickOnClick({ onPick }) {
   return null;
 }
 
-function ComplaintLocationMap({ gps, compact = false, onPick }) {
+function ComplaintLocationMap({ gps, compact = false, onPick, needsPin = false }) {
   const point = gps || DEFAULT_GPS;
   const zoom = gps ? 16 : 12;
   const area = getNearestHyderabadArea(point);
@@ -102,24 +116,25 @@ function ComplaintLocationMap({ gps, compact = false, onPick }) {
               fillOpacity: 0.05,
             }}
           />
-          <CircleMarker
-            center={[point.lat, point.lng]}
-            radius={gps ? 10 : 8}
-            pathOptions={{
-              color: gps ? "#2563eb" : "#94a3b8",
-              fillColor: gps ? "#2563eb" : "#94a3b8",
-              fillOpacity: 0.75,
-              weight: 3,
-            }}
-          >
-            <Popup>{gps ? area : "Hyderabad complaint location preview"}</Popup>
-          </CircleMarker>
+          {/* No pin until there is a real location - a grey dot at the city
+              centre would read as "the location" when there is none yet. */}
+          {gps && (
+            <CircleMarker
+              center={[point.lat, point.lng]}
+              radius={10}
+              pathOptions={{ color: "#2563eb", fillColor: "#2563eb", fillOpacity: 0.75, weight: 3 }}
+            >
+              <Popup>{area}</Popup>
+            </CircleMarker>
+          )}
         </MapContainer>
       </div>
       <div className="bg-panel2 px-4 py-3 text-xs text-ink/60">
         {gps
           ? `${area} | ${formatCoordinates(gps)} — tap the map to correct the pin`
-          : "After a photo is selected, this map moves to the complaint location."}
+          : needsPin
+            ? "Tap the map where the pothole is."
+            : "After a photo is selected, this map shows where it was taken."}
       </div>
     </div>
   );
@@ -147,24 +162,43 @@ export default function UploadPage() {
   const { saveAnalysis, drafts } = useReports();
   const navigate = useNavigate();
 
-  // A complaint's location is evidence. Never move it silently: when the
-  // device cannot give one inside Telangana, fall back to the city centre and
-  // say so, and let the user correct it on the map.
-  const setDevicePoint = (point) => {
-    if (isInsideTelangana(point)) {
-      setGps(point);
-      setGpsSource("device");
+  // gpsSource is "photo" | "device" | "map" once a location is set, or one of
+  // the "need-pin-*" reasons while the citizen still has to tap the map.
+  const [locating, setLocating] = useState(false);
+  const lookupRef = useRef(0); // ignore a slow lookup for a photo since replaced
+
+  // A complaint's location is evidence, so it is never guessed: it comes from
+  // the photo, from the phone at the moment of an in-app capture, or from the
+  // citizen's tap on the map.
+  const locatePhoto = async (file, origin) => {
+    const token = ++lookupRef.current;
+    setGps(null);
+    setGpsSource(null);
+    setLocating(true);
+
+    let point = await readPhotoLocation(file);
+    let source = "photo";
+    if (!point && origin === "camera") {
+      point = await getDeviceLocation();
+      source = "device";
+    }
+    if (token !== lookupRef.current) return;
+    setLocating(false);
+
+    if (!point) {
+      setGpsSource(origin === "camera" ? "need-pin-camera" : "need-pin-upload");
+    } else if (!isInsideTelangana(point)) {
+      setGpsSource("need-pin-outside");
     } else {
-      setGps(DEFAULT_GPS);
-      setGpsSource("outside");
+      setGps(point);
+      setGpsSource(source);
     }
   };
-  const setFallbackPoint = () => {
-    setGps(DEFAULT_GPS);
-    setGpsSource("fallback");
-  };
+
   const pickOnMap = (point) => {
     if (!isInsideTelangana(point)) return;
+    lookupRef.current += 1; // a tap overrides a lookup still in flight
+    setLocating(false);
     setGps(point);
     setGpsSource("map");
   };
@@ -175,19 +209,9 @@ export default function UploadPage() {
     setCameraOpen(false);
   }, []);
 
-  const captureGPS = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setDevicePoint({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        setFallbackPoint,
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-      );
-    } else {
-      setFallbackPoint();
-    }
-  };
-
-  const handleFile = useCallback((file) => {
+  // origin: "camera" (just taken, so the phone is at the pothole) or
+  // "upload" (from the gallery, so only the photo knows where it was taken).
+  const handleFile = useCallback((file, origin = "upload") => {
     if (!file) return;
     // The server enforces the same limits; checking here saves an upload.
     if (!ACCEPTED.includes(file.type)) {
@@ -203,7 +227,7 @@ export default function UploadPage() {
     setPhoto(file);
     setPreview(URL.createObjectURL(file));
     stopCamera();
-    captureGPS();
+    locatePhoto(file, origin);
   }, [stopCamera, preview]);
 
   const startCamera = async () => {
@@ -242,7 +266,7 @@ export default function UploadPage() {
     canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
       if (!blob) return;
-      handleFile(new File([blob], `roadguard-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      handleFile(new File([blob], `roadguard-${Date.now()}.jpg`, { type: "image/jpeg" }), "camera");
     }, "image/jpeg", 0.92);
   };
 
@@ -255,7 +279,13 @@ export default function UploadPage() {
   };
 
   const onFileSelect = (e) => {
-    handleFile(e.target.files[0]);
+    handleFile(e.target.files[0], "upload");
+    e.target.value = ""; // allow choosing the same file again
+  };
+
+  const onCameraFile = (e) => {
+    handleFile(e.target.files[0], "camera");
+    e.target.value = "";
   };
 
   const clearPreview = () => {
@@ -264,6 +294,8 @@ export default function UploadPage() {
     setPreview(null);
     setGps(null);
     setGpsSource(null);
+    setLocating(false);
+    lookupRef.current += 1;
     setError("");
     stopCamera();
   };
@@ -285,7 +317,7 @@ export default function UploadPage() {
       setProgress((p) => Math.min(p + 15, 90));
     }, 900);
     try {
-      const result = await analyzeImage(photo, gps);
+      const result = await analyzeImage(photo, gps, gpsSource);
       setStepIndex(STEPS.length - 1);
       setProgress(100);
       return result;
@@ -390,7 +422,7 @@ export default function UploadPage() {
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/bmp"
                         capture="environment"
-                        onChange={onFileSelect}
+                        onChange={onCameraFile}
                         className="sr-only"
                       />
                       <button
@@ -469,17 +501,26 @@ export default function UploadPage() {
                         <div>
                           <p className="font-semibold text-white">{getNearestHyderabadArea(gps)}</p>
                           <p className="text-xs text-ink/55">Latitude {gps.lat.toFixed(4)} | Longitude {gps.lng.toFixed(4)}</p>
-                          {GPS_NOTE[gpsSource] && (
-                            <p className="mt-1 text-xs text-amber-300">{GPS_NOTE[gpsSource]}</p>
+                          {LOCATION_NOTE[gpsSource] && (
+                            <p data-testid="location-note" className="mt-1 text-xs text-green-300">
+                              {LOCATION_NOTE[gpsSource].text} Wrong spot? Tap the map to move the pin.
+                            </p>
                           )}
                         </div>
                       </div>
                     )}
 
-                    {!gps && (
+                    {locating && (
                       <div className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-4 py-3 text-sm text-ink/70">
                         <Loader2 className="h-4 w-4 animate-spin text-signal" />
-                        Getting your location...
+                        Finding where this photo was taken...
+                      </div>
+                    )}
+
+                    {!gps && !locating && LOCATION_NOTE[gpsSource] && (
+                      <div data-testid="location-note" className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                        {LOCATION_NOTE[gpsSource].text}
                       </div>
                     )}
 
@@ -521,11 +562,13 @@ export default function UploadPage() {
 
         <div className={preview ? "space-y-6" : "lg:col-span-2 space-y-6"}>
           <div className="overflow-hidden rounded-2xl border border-line bg-panel">
-            <ComplaintLocationMap gps={gps} compact={!!preview} onPick={preview && !analyzing ? pickOnMap : undefined} />
+            <ComplaintLocationMap gps={gps} compact={!!preview} onPick={preview && !analyzing ? pickOnMap : undefined}
+              needsPin={!!preview && !gps && !locating}
+            />
             <div className="bg-panel p-5">
               <h3 className="font-display text-lg font-semibold text-white">Complaint Location</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink/65">
-                This map focuses on Hyderabad within Telangana and moves to the complaint location once a photo is selected. If the pin is wrong, tap the right spot.
+                The location comes from the photo itself, or from your phone when you take the photo here. If neither is available, tap the spot on the map. You can always tap to correct the pin.
               </p>
               <ul className="mt-4 space-y-2.5 text-sm text-ink/70">
                 <li className="flex gap-2">

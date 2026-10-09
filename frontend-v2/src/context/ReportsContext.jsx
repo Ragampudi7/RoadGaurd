@@ -60,6 +60,7 @@ export function ReportsProvider({ children }) {
       title: title ?? `Road defect at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
       latitude,
       longitude,
+      location_source: analysis.location.source ?? null,
       road_health_score: analysis.road_health_score,
       road_condition: analysis.road_condition,
       defect_percentage: analysis.defect_percentage,

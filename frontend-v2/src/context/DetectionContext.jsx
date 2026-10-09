@@ -30,11 +30,13 @@ export function DetectionProvider({ children }) {
   const track = (u) => { urls.current.push(u); return u; };
 
   /** Runs the model. Resolves to the result, or throws an ApiError. */
-  const analyzeImage = async (photo, point) => {
+  const analyzeImage = async (photo, point, locationSource) => {
     setBusy(true);
     setError(null);
     try {
-      const data = await callAnalyze({ file: photo, latitude: point.lat, longitude: point.lng });
+      const data = await callAnalyze({
+        file: photo, latitude: point.lat, longitude: point.lng, locationSource,
+      });
       revokeAll();
       const annotatedUrl = data.annotated_image
         ? track(URL.createObjectURL(b64ToBlob(data.annotated_image.data, data.annotated_image.mime_type)))

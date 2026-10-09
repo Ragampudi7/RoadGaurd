@@ -136,11 +136,13 @@ export const reports = {
 };
 
 /* ---------------------------------------------------------------- analyse -- */
-export async function analyze({ file, latitude, longitude, includeImage = true, includePdf = true, signal }) {
+export async function analyze({ file, latitude, longitude, locationSource, includeImage = true, includePdf = true, signal }) {
   const form = new FormData();
   form.append("image", file);
   form.append("latitude", String(latitude));
   form.append("longitude", String(longitude));
+  // photo | device | map. The server re-checks "photo" against the image.
+  if (locationSource) form.append("location_source", locationSource);
   const qs = new URLSearchParams({
     include_image: String(includeImage),
     include_pdf: String(includePdf),
