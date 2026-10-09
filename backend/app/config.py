@@ -248,6 +248,13 @@ class Settings(BaseSettings):
     complaint_region: str = "Hyderabad, Telangana, India"
     report_timezone_offset_minutes: int = 330  # IST (UTC+05:30)
 
+    # -- Start-up --------------------------------------------------------
+    # Load the YOLO model on a background thread so the API (login, reports)
+    # answers within seconds of a cold start. /analyze waits up to
+    # MODEL_WAIT_SECONDS for it, then answers 503 "model_loading".
+    model_load_in_background: bool = True
+    model_wait_seconds: float = 90.0
+
     # -- Place names (reverse geocoding) -----------------------------------
     # Coordinates -> "Road, Locality, City" via OpenStreetMap Nominatim. The
     # free service allows ~1 request/second and requires a User-Agent that

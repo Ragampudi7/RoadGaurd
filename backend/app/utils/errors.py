@@ -107,6 +107,14 @@ class ModelUnavailableError(AppError):
     )
 
 
+class ModelLoadingError(AppError):
+    """The server has just started and the model is still loading."""
+    status_code = 503
+    error_code = "model_loading"
+    message = ("The AI model is still loading after a server restart. "
+               "Please try again in a minute.")
+
+
 class InferenceError(AppError):
     status_code = 500
     error_code = "inference_failed"

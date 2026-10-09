@@ -29,7 +29,7 @@ from app.models.schemas import (
 from app.services import geocode_service
 from app.services.assessment_service import run_assessment
 from app.services.detection_service import get_detector
-from app.utils.errors import ServerBusyError
+from app.utils.errors import ModelLoadingError, ServerBusyError
 from app.utils.geotag import check_location_source
 from app.utils.logging_config import get_logger
 from app.utils.validation import read_upload, validate_coordinates, validate_declared_type
@@ -77,8 +77,10 @@ async def health() -> HealthResponse:
     else:
         persistence = "enabled" if engine_ready() else "unavailable"
 
+    loading = bool(getattr(detector, "is_loading", False))
     return HealthResponse(
-        status="ok" if detector.is_ready else "degraded",
+        status="ok" if detector.is_ready else ("starting" if loading else "degraded"),
+        model_loading=loading,
         version=settings.app_version,
         uptime_seconds=round(time.monotonic() - _STARTED_AT, 2),
         model_loaded=detector.is_ready,
@@ -127,6 +129,14 @@ async def analyze(
     lat, lon = validate_coordinates(latitude, longitude)
     image_bytes = await read_upload(image, settings)
     location = check_location_source(location_source, lat, lon, image_bytes)
+
+    # Just after a cold start the model may still be loading in the
+    # background. Wait for it rather than failing the citizen's first upload.
+    detector = get_detector()
+    if getattr(detector, "is_loading", False):
+        ready = await run_in_threadpool(detector.wait_until_loaded, settings.model_wait_seconds)
+        if not ready and getattr(detector, "is_loading", False):
+            raise ModelLoadingError()
     # Usually a cache hit: the upload screen looked this point up already.
     # Done before taking an inference slot so a slow lookup never holds one.
     location["address"] = await run_in_threadpool(geocode_service.reverse, lat, lon)

@@ -18,6 +18,8 @@ import {
 import { useDetection } from "../context/DetectionContext";
 import { getDeviceLocation, readPhotoLocation } from "../lib/photoLocation";
 import { usePlaceName } from "../lib/usePlaceName";
+import { useSlowHint } from "../lib/useSlowHint";
+import WakingNote from "../components/WakingNote";
 import { useReports } from "../context/ReportsContext";
 import {
   formatCoordinates,
@@ -166,6 +168,7 @@ export default function UploadPage() {
   // the "need-pin-*" reasons while the citizen still has to tap the map.
   const [locating, setLocating] = useState(false);
   const place = usePlaceName(gps);
+  const slowAnalysis = useSlowHint(analyzing, 15000);
   const lookupRef = useRef(0); // ignore a slow lookup for a photo since replaced
 
   // A complaint's location is evidence, so it is never guessed: it comes from
@@ -390,6 +393,14 @@ export default function UploadPage() {
                   />
                 </div>
                 <p className="mt-3 text-sm text-ink/60">{Math.round(progress)}% complete</p>
+                {slowAnalysis && (
+                  <div className="mx-auto mt-6 max-w-md text-left">
+                    <WakingNote>
+                      Taking longer than usual: the server has just started and the AI model is
+                      still loading. The first analysis after a restart can take about a minute.
+                    </WakingNote>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

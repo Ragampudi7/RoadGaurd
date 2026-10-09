@@ -103,12 +103,17 @@ async def lifespan(app: FastAPI):
         logger.info("DATABASE_URL not set - reports will not be persisted")
 
     detector = get_detector()
-    detector.load()
-    if not detector.is_ready:
-        logger.warning(
-            "No detection model loaded - /analyze will answer 503 until weights are available. %s",
-            detector.load_error or "",
-        )
+    background = getattr(detector, "start_background_load", None)
+    if settings.model_load_in_background and background is not None:
+        background()
+        logger.info("Accepting requests now; the detection model is loading in the background")
+    else:
+        detector.load()
+        if not detector.is_ready:
+            logger.warning(
+                "No detection model loaded - /analyze will answer 503 until weights are available. %s",
+                detector.load_error or "",
+            )
     yield
     detector.unload()
     await dispose_engine()

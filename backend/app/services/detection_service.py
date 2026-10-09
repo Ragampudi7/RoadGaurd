@@ -67,11 +67,45 @@ class RoadDefectDetector:
         self._load_error: Optional[str] = None
         # Ultralytics models are not thread-safe; serialise access.
         self._lock = threading.Lock()
+        # Background loading. Importing torch and loading the weights takes
+        # ~1 minute on a free Render instance; doing it before the server
+        # accepts connections made login - which needs no model at all - wait
+        # for it after every cold start. Now the server answers at once and
+        # only /analyze waits for the model.
+        self._load_lock = threading.Lock()
+        self._loading = False
+        self._loaded_event = threading.Event()
 
     # -- lifecycle --------------------------------------------------------
 
+    def start_background_load(self) -> None:
+        """Begin load() on a daemon thread and return immediately."""
+        if self._model is not None or self._loading:
+            return
+        self._loading = True
+        self._loaded_event.clear()
+
+        def run() -> None:
+            try:
+                self.load()
+            finally:
+                self._loading = False
+                self._loaded_event.set()
+
+        threading.Thread(target=run, name="model-loader", daemon=True).start()
+
+    def wait_until_loaded(self, timeout: float) -> bool:
+        """Block until a background load has finished (either way). True if ready."""
+        if self._loading:
+            self._loaded_event.wait(timeout)
+        return self.is_ready
+
     def load(self) -> None:
         """Load the model once. Never raises - failures are recorded instead."""
+        with self._load_lock:
+            self._load_unlocked()
+
+    def _load_unlocked(self) -> None:
         if self._model is not None:
             return
 
@@ -184,6 +218,10 @@ class RoadDefectDetector:
     @property
     def is_ready(self) -> bool:
         return self._model is not None
+
+    @property
+    def is_loading(self) -> bool:
+        return self._loading
 
     @property
     def status(self) -> str:

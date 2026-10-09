@@ -187,10 +187,11 @@ class RootResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status: str = Field(..., description="'ok' when the API can serve analysis requests, 'degraded' otherwise")
+    status: str = Field(..., description="'ok' when the API can serve analysis requests, 'starting' while the model is still loading after a restart, 'degraded' when no model could be loaded")
     version: str
     uptime_seconds: float
     model_loaded: bool
+    model_loading: bool = Field(default=False, description="True while the model loads in the background after a restart; /analyze waits for it")
     model: ModelInfo
     persistence: str = Field(
         default="disabled",

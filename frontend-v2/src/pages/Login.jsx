@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import AuthLayout from "../layouts/AuthLayout";
+import WakingNote from "../components/WakingNote";
+import { useSlowHint } from "../lib/useSlowHint";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -11,6 +13,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const slow = useSlowHint(busy);
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,6 +80,8 @@ export default function Login() {
             </button>
           </div>
         </div>
+
+        {slow && <WakingNote />}
 
         <motion.button
           whileHover={{ scale: 1.01 }}

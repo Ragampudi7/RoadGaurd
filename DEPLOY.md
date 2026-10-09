@@ -4,9 +4,12 @@ Two services from one repository: the FastAPI backend and the static frontend.
 Each has its own `Dockerfile`, so the build is identical wherever it runs and
 nothing depends on a platform's language auto-detection guessing right.
 
-The instructions below are for **Railway**. A `render.yaml` blueprint is also
-in the repository root and is correct; Render is simply not what this was
-deployed on.
+**The live deployment runs on Render**, from the `render.yaml` blueprint in the
+repository root (API: `roadguard-api`, UI: `roadguard-ui`, built from
+`frontend-v2/`). Render → New → Blueprint → this repository, then enter
+`DATABASE_URL`, `JWT_SECRET` and `OFFICIAL_EMAILS` when prompted. The step-by-
+step sections below were written for **Railway** and still work there as an
+alternative.
 
 ---
 
@@ -139,14 +142,40 @@ redeploy.
 
 ## What "working" looks like
 
-- `GET /health` → `"status": "trained"`, `"model_loaded": true`
-- The UI loads with **no** "Demo data" badges. If you see them, `VITE_USE_MOCK`
-  did not reach the build.
+- `GET /health` → `"status": "ok"`, `"model_loaded": true`. For the first
+  minute after a (re)start it says `"status": "starting"`, `"model_loading":
+  true` - the API already serves logins and reports then; only `/analyze`
+  waits for the model.
 - Sign up, upload a road photograph, and the analysis returns real detections.
 - File the report, then reload the page — it is still there. That is the
   database.
 - Sign in on a phone: the same reports. That is the database again, and it is
   the thing localStorage could never do.
+
+---
+
+## Keeping the free API awake (demo day)
+
+Render's free plan puts the API to sleep after 15 minutes without a request.
+The next visitor then waits while it starts again - the UI says "The server
+is waking up" instead of looking frozen, and opening any page of the site
+pings the API so it is usually awake by the time someone has typed their
+password. The AI model loads in the background after start-up, so login does
+not wait for it; only the first photo analysis does.
+
+For a presentation, keep it awake instead:
+
+1. Sign up at **uptimerobot.com** (free).
+2. **Add New Monitor** → type **HTTP(s)**.
+3. URL: `https://roadguard-api-f019.onrender.com/health`
+4. Monitoring interval: **5 minutes**. Save.
+
+A ping every 5 minutes means the API never idles for 15. Render's free plan
+includes 750 instance hours a month, enough for this one service to run
+around the clock. Pause the monitor afterwards if you prefer it to sleep.
+
+The UI (`roadguard-ui`) is a static site: it uses no instance hours, and only
+the API needs waking. (Source: https://render.com/docs/free)
 
 ---
 
